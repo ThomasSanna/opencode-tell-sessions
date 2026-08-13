@@ -2,7 +2,6 @@ node_modules/
 dist/
 *.log
 .DS_Store
-.opencode/
 .omo/
 .codegraph/
 .superpowers/
