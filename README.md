@@ -1,5 +1,12 @@
 # opencode-tell-sessions
 
+[English](README.md) | [Français](README.fr.md) | [한국어](README.ko.md) | [日本語](README.ja.md) | [简体中文](README.zh-CN.md)
+
+[![npm version](https://img.shields.io/npm/v/opencode-tell-sessions)](https://www.npmjs.com/package/opencode-tell-sessions)
+[![npm downloads](https://img.shields.io/npm/dm/opencode-tell-sessions)](https://www.npmjs.com/package/opencode-tell-sessions)
+[![License](https://img.shields.io/npm/l/opencode-tell-sessions)](https://github.com/ThomasSanna/opencode-tell-sessions/blob/main/LICENSE)
+[![CI](https://img.shields.io/github/actions/workflow/status/ThomasSanna/opencode-tell-sessions/ci.yml?branch=main)](https://github.com/ThomasSanna/opencode-tell-sessions/actions)
+
 Inter-session direct messaging (DM) for OpenCode: agents in different sessions
 on the same server can talk to each other in real time, without human
 intervention.
@@ -34,6 +41,11 @@ bun install
 bun test        # unit tests
 bun run typecheck
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution guide —
+language policy, project structure, and pull request process.
 
 ## License
 
