@@ -55,6 +55,11 @@ describe("resolveTarget", () => {
     expect(r.kind).toBe("not-found");
   });
 
+  test("target vide ou blanc → not-found", () => {
+    expect(resolveTarget(sessions, "  ").kind).toBe("not-found");
+    expect(resolveTarget(sessions, "").kind).toBe("not-found");
+  });
+
   test("cible = expéditeur → self", () => {
     const r = resolveTarget(sessions, "backend api", "b");
     expect(r.kind).toBe("self");

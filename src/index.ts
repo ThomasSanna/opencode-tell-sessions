@@ -18,6 +18,7 @@ export function resolveTarget(
   senderID?: string,
 ): ResolveResult {
   const t = target.trim();
+  if (t === "") return { kind: "not-found" };
   const self = (s: Session): ResolveResult =>
     senderID && s.id === senderID ? { kind: "self" } : { kind: "ok", session: s };
   const exact = sessions.find((s) => s.title === t);
@@ -27,7 +28,14 @@ export function resolveTarget(
   const lower = t.toLowerCase();
   const matches = sessions.filter((s) => s.title.toLowerCase().includes(lower));
   if (matches.length === 1) return self(matches[0]);
-  if (matches.length > 1) return { kind: "ambiguous", candidates: matches };
+  if (matches.length > 1) {
+    const candidates = senderID
+      ? matches.filter((s) => s.id !== senderID)
+      : matches;
+    if (candidates.length === 1) return self(candidates[0]);
+    if (candidates.length === 0) return { kind: "not-found" };
+    return { kind: "ambiguous", candidates };
+  }
   return { kind: "not-found" };
 }
 
@@ -48,8 +56,15 @@ export function cropExcerpt(
     0,
     Math.floor((maxChars - query.length - 2) / 2),
   );
-  const start = Math.max(0, idx - half);
-  const end = Math.min(text.length, idx + query.length + half);
+  let start = Math.max(0, idx - half);
+  let end = Math.min(text.length, idx + query.length + half);
+  const room = Math.max(0, maxChars - 2);
+  if (end - start > room) {
+    const over = end - start - room;
+    start = Math.min(idx, start + Math.ceil(over / 2));
+    end = end - Math.floor(over / 2);
+    if (end - start > room) end = start + room;
+  }
   return `…${text.slice(start, end)}…`;
 }
 
@@ -117,8 +132,8 @@ export function describeCandidates(candidates: Session[]): string {
     .join("\n");
 }
 
-export function listRecentHint(sessions: Session[]): string {
-  return recentSessions(sessions, 5)
+export function listRecentHint(sessions: Session[], excludeID?: string): string {
+  return recentSessions(sessions, 5, excludeID)
     .map((s) => `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`)
     .join("\n");
 }
@@ -152,32 +167,36 @@ export const plugin: Plugin = async (input) => {
               directory: s.directory,
             }));
             const seen = new Set(hits.map((h) => h.sessionID));
-            for (const s of recentSessions(all, limit, ctx.sessionID)) {
-              if (seen.has(s.id)) continue;
-              let excerpt: string | undefined;
-              try {
-                const { data: msgs } = await client.session.messages({
-                  path: { id: s.id },
-                  query: { limit: 10 },
-                  throwOnError: true,
-                });
-                const text = (msgs ?? [])
-                  .map((m) => collectText(m.parts))
-                  .join("\n");
-                excerpt = cropExcerpt(text, args.query, 300);
-              } catch {
-                excerpt = undefined;
-              }
-              hits.push({
-                sessionID: s.id,
-                title: s.title,
-                created: s.time.created,
-                updated: s.time.updated,
-                directory: s.directory,
-                excerpt,
-              });
-              seen.add(s.id);
-            }
+            const recent = recentSessions(all, limit, ctx.sessionID).filter(
+              (s) => !seen.has(s.id),
+            );
+            const scanned = await Promise.all(
+              recent.map(async (s): Promise<SearchHit> => {
+                let excerpt: string | undefined;
+                try {
+                  const { data: msgs } = await client.session.messages({
+                    path: { id: s.id },
+                    query: { limit: 100 },
+                    throwOnError: true,
+                  });
+                  const text = (msgs ?? [])
+                    .map((m) => collectText(m.parts))
+                    .join("\n");
+                  excerpt = cropExcerpt(text, args.query, 300);
+                } catch {
+                  excerpt = undefined;
+                }
+                return {
+                  sessionID: s.id,
+                  title: s.title,
+                  created: s.time.created,
+                  updated: s.time.updated,
+                  directory: s.directory,
+                  excerpt,
+                };
+              }),
+            );
+            hits.push(...scanned);
             hits.sort((a, b) => b.updated - a.updated);
             return { title: "Sessions trouvées", output: buildSearchResult(hits) };
           } catch (err) {
@@ -212,7 +231,7 @@ export const plugin: Plugin = async (input) => {
               };
             }
             if (resolved.kind === "not-found") {
-              const hint = listRecentHint(all);
+              const hint = listRecentHint(all, ctx.sessionID);
               return {
                 title: "Session introuvable",
                 output:
