@@ -15,6 +15,15 @@
   },
   "keywords": ["opencode", "opencode-plugin"],
   "license": "MIT",
+  "author": "ThomasSanna",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ThomasSanna/opencode-inter-session-dm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ThomasSanna/opencode-inter-session-dm/issues"
+  },
+  "homepage": "https://github.com/ThomasSanna/opencode-inter-session-dm#readme",
   "dependencies": {
     "@opencode-ai/sdk": "1.18.16",
     "zod": "4.1.8"
