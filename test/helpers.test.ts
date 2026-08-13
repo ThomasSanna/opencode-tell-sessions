@@ -84,6 +84,10 @@ describe("formatDM", () => {
     const long = "x".repeat(61);
     expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
   });
+  test("empty or blank source title → message without prefix", () => {
+    expect(formatDM("", "hi")).toBe("hi");
+    expect(formatDM("   ", "hi")).toBe("hi");
+  });
 });
 
 describe("cropExcerpt", () => {

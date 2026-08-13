@@ -37,8 +37,10 @@ export function resolveTarget(
 }
 
 export function formatDM(senderTitle: string, message: string): string {
-  const source = senderTitle.length > 60 ? `${senderTitle.slice(0, 60)}…` : senderTitle;
-  return `@${source} | ${message}`;
+  const trimmed = senderTitle.trim();
+  const source =
+    trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
+  return source === "" ? message : `@${source} | ${message}`;
 }
 
 export function cropExcerpt(
