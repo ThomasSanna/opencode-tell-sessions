@@ -107,6 +107,22 @@ export function buildSearchResult(hits: SearchHit[]): string {
   return out.length <= cap ? out : `${out.slice(0, cap - suffix.length)}${suffix}`;
 }
 
+export function describeCandidates(candidates: Session[]): string {
+  if (candidates.length === 0) return "Aucune session ne correspond.";
+  return candidates
+    .map(
+      (s) =>
+        `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`,
+    )
+    .join("\n");
+}
+
+export function listRecentHint(sessions: Session[]): string {
+  return recentSessions(sessions, 5)
+    .map((s) => `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`)
+    .join("\n");
+}
+
 export const plugin: Plugin = async (input) => {
   const client = input.client;
 
@@ -168,6 +184,68 @@ export const plugin: Plugin = async (input) => {
             return {
               title: "Erreur session_search",
               output: `Impossible de lister les sessions : ${String(err)}`,
+            };
+          }
+        },
+      }),
+      session_send: tool({
+        description:
+          "Envoie un message direct (DM) à une autre session OpenCode du même serveur. " +
+          "Utilise-le quand l'utilisateur demande de parler à une autre session " +
+          "(ex. 'demande à la session frontend de...', 'tell weekly-digest ...'). " +
+          "Le message est injecté dans la session cible avec le préfixe @titre-source. " +
+          "N'envoie un DM que si l'utilisateur le demande ou si un autre agent t'a explicitement demandé de répondre. " +
+          "Ne réponds pas automatiquement à un DM reçu, sauf si le message contient une question ou une requête pour toi.",
+        args: {
+          target: z.string().describe("Titre de la session cible (ou son id)"),
+          message: z.string().describe("Contenu du message à envoyer"),
+        },
+        async execute(args, ctx) {
+          try {
+            const { data: sessions } = await client.session.list({ throwOnError: true });
+            const all = sessions ?? [];
+            const resolved = resolveTarget(all, args.target, ctx.sessionID);
+            if (resolved.kind === "self") {
+              return {
+                title: "session_send refusé",
+                output: "Tu es déjà dans cette session. Choisis une autre session cible.",
+              };
+            }
+            if (resolved.kind === "not-found") {
+              const hint = listRecentHint(all);
+              return {
+                title: "Session introuvable",
+                output:
+                  `Session "${args.target}" introuvable. Utilise session_search pour trouver la bonne session.\n` +
+                  `Sessions récentes du serveur :\n${hint}`,
+              };
+            }
+            if (resolved.kind === "ambiguous") {
+              return {
+                title: "Session ambiguë",
+                output:
+                  `Plusieurs sessions correspondent à "${args.target}". Précise avec un id ou un titre plus exact :\n` +
+                  describeCandidates(resolved.candidates),
+              };
+            }
+            const targetSession = resolved.session;
+            const sender =
+              all.find((s) => s.id === ctx.sessionID)?.title ?? ctx.sessionID;
+            const text = formatDM(sender, args.message);
+            await client.session.promptAsync({
+              path: { id: targetSession.id },
+              body: { parts: [{ type: "text", text }] },
+              throwOnError: true,
+            });
+            return {
+              title: "DM envoyé",
+              output:
+                `DM envoyé à "${targetSession.title}" (${targetSession.id}) à ${fmtTime(Date.now())}.`,
+            };
+          } catch (err) {
+            return {
+              title: "Erreur session_send",
+              output: `Impossible d'envoyer le DM : ${String(err)}`,
             };
           }
         },
