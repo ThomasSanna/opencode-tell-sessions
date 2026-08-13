@@ -1,0 +1,29 @@
+{
+  "name": "opencode-inter-session-dm",
+  "version": "0.1.0",
+  "description": "Inter-session direct messaging (DM) for OpenCode: agents in different sessions can message each other",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src"],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "keywords": ["opencode", "opencode-plugin"],
+  "license": "MIT",
+  "dependencies": {
+    "@opencode-ai/sdk": "1.18.16",
+    "zod": "^4.1.8"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "1.18.16",
+    "typescript": "^5.8.2"
+  }
+}
