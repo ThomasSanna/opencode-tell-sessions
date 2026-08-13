@@ -108,6 +108,22 @@ Use the [PR template](.github/pull_request_template.md). Before opening the PR:
 
 ## Publishing
 
-Maintainers only. `npm publish` is run manually after the CI is green on
-`main`. The published package includes only the `src/` directory (see the
-`files` field in `package.json`).
+Releases are automated with Release Please:
+
+1. Every push to `main` runs the `Release Please` workflow, which opens a
+   release PR (version bump in `package.json` + `CHANGELOG.md` updates).
+2. Merging that PR creates a GitHub release and the `vX.Y.Z` tag.
+3. The `Publish to npm` workflow (triggered by the tag, or manually via
+   `workflow_dispatch` with a `tag` input) runs `npm publish`.
+
+Secrets required:
+
+- `NPM_TOKEN` — an npm access token with publish rights (required for the
+  publish step).
+- `RELEASE_PLEASE_TOKEN` — optional. A PAT makes the tag created by Release
+  Please re-trigger the publish workflow automatically; with the default
+  `GITHUB_TOKEN`, the tag push does not fire `on: push: tags` workflows
+  (documented GitHub limitation), so run the publish manually instead.
+
+The published package includes only the `src/` directory (see the `files`
+field in `package.json`).
