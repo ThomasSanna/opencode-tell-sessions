@@ -75,7 +75,7 @@ describe("formatDM", () => {
     `(or title "${title}") and your answer as the message. ` +
     `Reply only when needed — if either side has already gotten what it wanted ` +
     `from the exchange, let the conversation end there. ` +
-    `Do not answer this message normally in this session.`;
+    `If you are replying, do not answer this message normally in this session.`;
 
   test("@source prefix + reply instructions", () => {
     expect(formatDM("user-profiles", "users.name → display_name", "s1")).toBe(
