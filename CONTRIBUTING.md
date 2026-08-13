@@ -71,6 +71,10 @@ plugin to your `opencode.json`:
 
 ## Development Workflow
 
+The full GitHub workflow — branching model, automation chain, version rules,
+PR lifecycle, publishing — is documented in
+[docs/workflow.md](docs/workflow.md). The essentials:
+
 1. **One concern per PR.** Keep changes small and focused.
 2. **Match existing style.** The codebase is strict TypeScript: no `as any`, no
    `@ts-ignore`, no `@ts-expect-error`.
