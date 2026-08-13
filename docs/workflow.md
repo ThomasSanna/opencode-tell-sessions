@@ -6,32 +6,39 @@ external contributors.
 
 ## 1. Branching model
 
-The project uses **trunk-based development** on `main`.
+The project uses a **two-branch model**: `dev` is the integration branch
+where all development happens, `main` is the release branch.
 
 | Branch | Purpose | Who pushes |
 |---|---|---|
-| `main` | The only long-lived branch. Always releasable: every push runs CI, and `feat:`/`fix:` commits are candidates for the next release. | Maintainers (direct push), automated bots (Release Please, Dependabot), PR merges |
-| `feat/...`, `fix/...` | Short-lived feature/fix branches for external contributions. Merged to `main` via PR (squash). | Contributors |
+| `dev` | **Integration branch.** All development happens here. Every push runs CI. `feat:`/`fix:` commits accumulate until a release is wanted. | Maintainers (direct push), Dependabot PRs, feature-branch merges |
+| `main` | **Release branch.** Receives `dev` only when a release is wanted. Pushes to `main` run CI + Release Please (release PR, tag, publish). | Maintainers (merge/push from `dev`), Release Please |
+| `feat/...`, `fix/...` | Short-lived feature/fix branches for external contributions. Merged to `dev` via PR (squash). | Contributors |
 
 Rules:
 
-- Never force-push to `main`.
-- Keep `main` green: `bun test` and `bun run typecheck` must pass before any
-  push/merge.
+- Never force-push to `main` or `dev`.
+- Keep both branches green: `bun test` and `bun run typecheck` must pass
+  before any push/merge.
 - Small commits, one concern per commit. Commit messages follow the
   conventional format: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`,
   `i18n:`.
+- A release happens **only** when `dev` is merged into `main` — never
+  release from `dev`.
 
 ## 2. Automation chain
 
-Every push to `main` triggers up to two workflows in parallel:
+Pushes to `dev` run CI only. Pushes to `main` (i.e. a deliberate
+dev → main promotion) run CI **and** Release Please:
 
 ```
-push to main
-  ├─► CI (ci.yml)                 bun install --frozen-lockfile
-  │                               bun run typecheck
-  │                               bun test
-  │
+push to dev
+  └─► CI (ci.yml)                 bun install --frozen-lockfile
+                                  bun run typecheck
+                                  bun test
+
+push to main (promotion of dev)
+  ├─► CI (ci.yml)                 same checks
   └─► Release Please (release-please.yml)
         ├─ no user-facing change  → nothing happens
         └─ feat:/fix: present     → opens release PR "chore(main): release X.Y.Z"
@@ -52,8 +59,8 @@ Three workflows, each with a single responsibility:
 
 | Workflow | Trigger | Responsibility |
 |---|---|---|
-| `ci.yml` | push to `main`, any PR | Test + typecheck gate |
-| `release-please.yml` | push to `main` | Version management: release PR, tag, GitHub release |
+| `ci.yml` | push to `dev`/`main`, any PR | Test + typecheck gate |
+| `release-please.yml` | push to `main` only | Version management: release PR, tag, GitHub release |
 | `publish.yml` | tag `v*` push, or manual `workflow_dispatch` | npm publish via Trusted Publishing (OIDC) |
 
 ## 3. Version rules
@@ -86,27 +93,41 @@ Important:
 1. Create a branch: `git checkout -b feat/your-change`.
 2. Make the change, add or update tests.
 3. Run `bun test` and `bun run typecheck` locally until green.
-4. Push and open a PR against `main` using the PR template.
+4. Push and open a PR against `dev` using the PR template.
 5. CI runs on the PR. The PR must be **green** before merging.
 6. Merge with **squash** and a conventional commit message (the squash
-   message becomes the single commit on `main` — it decides the release
-   bump, so use `feat:` or `fix:` deliberately).
+   message becomes the single commit on `dev` — it decides the future
+   release bump, so use `feat:` or `fix:` deliberately).
 
-### 4.2 Release PR (created by Release Please)
+### 4.2 Promoting `dev` → `main` (maintainer)
+
+When the accumulated `dev` work is ready to ship:
+
+1. Verify `dev` is green (CI) and up to date.
+2. Merge `dev` into `main` with a **merge commit** (not squash — keep the
+   individual commits so Release Please sees each one):
+   `git checkout main && git pull && git merge dev --no-ff && git push`.
+3. This push to `main` runs CI + Release Please, which opens the release
+   PR if `feat:`/`fix:` commits are present.
+
+### 4.3 Release PR (created by Release Please)
 
 - Title: `chore(main): release X.Y.Z`.
 - Contains: `package.json` version bump + `CHANGELOG.md` update.
 - Do **not** edit the content by hand — let Release Please manage it.
 - Review the changelog, then merge with **squash**.
 - Merging triggers the tag + GitHub release + npm publish automatically.
+- After merging, merge `main` back into `dev` so `dev` keeps the version
+  bump and CHANGELOG:
+  `git checkout dev && git merge main && git push`.
 
-### 4.3 Dependabot PRs
+### 4.4 Dependabot PRs
 
 - Dependabot opens PRs for `npm` and `github-actions` dependency updates
-  (weekly, label `dependencies`).
+  (weekly, label `dependencies`) against `dev`.
 - CI runs on each PR; merge when green.
-- `fix:`-style dependency bumps will trigger a release on merge; minor
-  tooling updates usually come as `chore:` and stay unreleased.
+- `fix:`-style dependency bumps will trigger a release when `dev` → `main`;
+  minor tooling updates usually come as `chore:` and stay unreleased.
 - Do not merge two Dependabot PRs back-to-back without checking the release
   PR state — Release Please coalesces pending commits into one release.
 
@@ -129,9 +150,11 @@ The published package contains only `src/` (see `files` in `package.json`).
 
 | Action | Method |
 |---|---|
-| Feature/contributor PR | **squash** — one commit on main |
+| Feature/contributor PR → `dev` | **squash** — one commit on dev |
+| `dev` → `main` promotion | **merge commit** (`--no-ff`) — keeps individual commits visible to Release Please |
 | Release PR | **squash** — Release Please expects a single merge commit |
-| Direct pushes to main | allowed for maintainers, keep commits conventional |
+| Direct pushes to `dev` | allowed for maintainers, keep commits conventional |
+| Direct pushes to `main` | discouraged — prefer the `dev` → `main` promotion |
 
 Never use **rebase-merge** for Release Please PRs (it can confuse the
 tag↔PR association), and never **edit** a release PR's files.
@@ -145,3 +168,4 @@ tag↔PR association), and never **edit** a release PR's files.
 | `npm error E403 ... previously published versions` | Version already on npm | Expected when re-testing an existing tag; next release will be a new version |
 | `publish.yml` not triggered by a tag | `RELEASE_PLEASE_TOKEN` missing — tag pushed with `GITHUB_TOKEN` doesn't fire tag workflows | Add the secret, or run the workflow manually with the tag input |
 | Local push rejected (`non-fast-forward`) | `origin/main` advanced (release PR merged) | `git fetch origin && git rebase origin/main`, then push |
+| No release PR after promoting `dev` → `main` | No `feat:`/`fix:` commit since last tag | Expected if `dev` only accumulated `chore:`/`docs:` commits; nothing to ship |

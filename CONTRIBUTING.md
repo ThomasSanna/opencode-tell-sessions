@@ -91,7 +91,9 @@ PR lifecycle, publishing — is documented in
 4. Run `bun test` and `bun run typecheck` until both pass.
 5. Commit with a concise message that matches the repo style
    (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `i18n:`).
-6. Open a pull request against `main` using the PR template.
+6. Open a pull request against `dev` using the PR template. Releases are
+   cut from `main` when `dev` is promoted — see
+   [docs/workflow.md](docs/workflow.md).
 
 ### Adding a Skill or Command
 
