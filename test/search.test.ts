@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildSearchResult } from "../src/index";
+import { buildSearchResult } from "../src/helpers";
 
 describe("buildSearchResult", () => {
   test("liste lisible avec excerpt optionnel", () => {

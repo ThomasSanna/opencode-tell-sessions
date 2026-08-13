@@ -8,7 +8,7 @@ import {
   searchByTitle,
   fmtTime,
   type Session,
-} from "../src/index";
+} from "../src/helpers";
 
 const session = (id: string, title: string, updated: number): Session => ({
   id,
