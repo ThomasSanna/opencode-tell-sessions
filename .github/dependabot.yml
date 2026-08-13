@@ -13,9 +13,9 @@ updates:
       # zod is pinned EXACTLY (4.1.8, no caret): a dual-copy mismatch with
       # @opencode-ai/plugin breaks the plugin at runtime. Never bump.
       - dependency-name: "zod"
-      # typescript 7.x fails the strict typecheck; keep on 5.x for now.
+      # typescript 6.x/7.x fails the strict typecheck; keep on 5.x for now.
       - dependency-name: "typescript"
-        versions: [">=7.0.0"]
+        versions: [">=6.0.0"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
