@@ -1,4 +1,4 @@
-# opencode-inter-session-dm
+# opencode-tell-sessions
 
 Messagerie directe (DM) inter-sessions pour OpenCode : les agents de sessions
 différentes du même serveur peuvent se parler en temps réel, sans intervention
@@ -10,7 +10,7 @@ Ajoutez le plugin à votre `opencode.json` :
 
 ```json
 {
-  "plugin": ["opencode-inter-session-dm"]
+  "plugin": ["opencode-tell-sessions"]
 }
 ```
 

@@ -1,5 +1,5 @@
 {
-  "name": "opencode-inter-session-dm",
+  "name": "opencode-tell-sessions",
   "version": "0.1.0",
   "description": "Inter-session direct messaging (DM) for OpenCode: agents in different sessions can message each other",
   "type": "module",
@@ -18,12 +18,12 @@
   "author": "ThomasSanna",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ThomasSanna/opencode-inter-session-dm.git"
+    "url": "https://github.com/ThomasSanna/opencode-tell-sessions.git"
   },
   "bugs": {
-    "url": "https://github.com/ThomasSanna/opencode-inter-session-dm/issues"
+    "url": "https://github.com/ThomasSanna/opencode-tell-sessions/issues"
   },
-  "homepage": "https://github.com/ThomasSanna/opencode-inter-session-dm#readme",
+  "homepage": "https://github.com/ThomasSanna/opencode-tell-sessions#readme",
   "dependencies": {
     "@opencode-ai/sdk": "1.18.16",
     "zod": "4.1.8"
