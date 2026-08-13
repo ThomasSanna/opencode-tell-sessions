@@ -13,7 +13,21 @@
     "typecheck": "tsc --noEmit",
     "test": "bun test"
   },
-  "keywords": ["opencode", "opencode-plugin"],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "plugin",
+    "agents",
+    "ai",
+    "llm",
+    "messaging",
+    "session",
+    "inter-session",
+    "dm",
+    "real-time",
+    "typescript",
+    "bun"
+  ],
   "license": "MIT",
   "author": "ThomasSanna",
   "repository": {
