@@ -42,7 +42,7 @@
   "homepage": "https://github.com/ThomasSanna/opencode-tell-sessions#readme",
   "dependencies": {
     "@opencode-ai/sdk": "1.18.16",
-    "zod": "4.1.8"
+    "zod": "4.4.3"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.0.0"
