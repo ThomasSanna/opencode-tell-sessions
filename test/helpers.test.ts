@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import {
   collectText,
+  countInboundDMs,
   cropExcerpt,
+  DM_EXCHANGE_LIMIT,
   formatDM,
   recentSessions,
   resolveTarget,
@@ -67,26 +69,80 @@ describe("resolveTarget", () => {
 });
 
 describe("formatDM", () => {
-  test("@source prefix", () => {
-    expect(formatDM("user-profiles", "users.name → display_name")).toBe(
-      "@user-profiles | users.name → display_name",
+  const block = (title: string, id: string) =>
+    `Direct message from session "${title}" (id: ${id}). ` +
+    `Reply to the sender using the session_send tool with target "${id}" ` +
+    `(or title "${title}") and your answer as the message. ` +
+    `Reply only when needed — if either side has already gotten what it wanted ` +
+    `from the exchange, let the conversation end there. ` +
+    `Do not answer this message normally in this session.`;
+
+  test("@source prefix + reply instructions", () => {
+    expect(formatDM("user-profiles", "users.name → display_name", "s1")).toBe(
+      `@user-profiles | users.name → display_name\n\n---\n\n${block("user-profiles", "s1")}`,
     );
   });
-  test("source title longer than 60 chars is truncated", () => {
+  test("source title longer than 60 chars → truncated prefix, full title kept in the block", () => {
     const long = "x".repeat(80);
-    expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
+    expect(formatDM(long, "hi", "s1")).toBe(
+      `@${"x".repeat(60)}… | hi\n\n---\n\n${block(long, "s1")}`,
+    );
   });
   test("title of exactly 60 chars → no truncation", () => {
     const exact = "x".repeat(60);
-    expect(formatDM(exact, "hi")).toBe(`@${exact} | hi`);
+    expect(formatDM(exact, "hi", "s1")).toBe(
+      `@${exact} | hi\n\n---\n\n${block(exact, "s1")}`,
+    );
   });
-  test("title of 61 chars → truncated to 60 + ellipsis", () => {
+  test("title of 61 chars → truncated to 60 + ellipsis in the prefix", () => {
     const long = "x".repeat(61);
-    expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
+    expect(formatDM(long, "hi", "s1")).toBe(
+      `@${"x".repeat(60)}… | hi\n\n---\n\n${block(long, "s1")}`,
+    );
   });
-  test("empty or blank source title → message without prefix", () => {
-    expect(formatDM("", "hi")).toBe("hi");
-    expect(formatDM("   ", "hi")).toBe("hi");
+  test("empty or blank source title → message without prefix, block uses the sender id", () => {
+    expect(formatDM("", "hi", "s1")).toBe(`hi\n\n---\n\n${block("s1", "s1")}`);
+    expect(formatDM("   ", "hi", "s2")).toContain('session "s2" (id: s2)');
+  });
+  test("empty or blank sender id → prefix only, no instructions", () => {
+    expect(formatDM("user-profiles", "hi", "")).toBe("@user-profiles | hi");
+    expect(formatDM("user-profiles", "hi", "   ")).toBe("@user-profiles | hi");
+    expect(formatDM("", "hi", "")).toBe("hi");
+  });
+});
+
+describe("countInboundDMs", () => {
+  const dm = (id: string) =>
+    `Direct message from session "X" (id: ${id}). Reply to the sender using the session_send tool with target "${id}".`;
+
+  test("counts text parts carrying the sender marker", () => {
+    const messages = [
+      { parts: [{ type: "text", text: dm("ses_a") }] },
+      { parts: [{ type: "text", text: dm("ses_b") }] },
+      { parts: [{ type: "text", text: "plain user message" }] },
+    ];
+    expect(countInboundDMs(messages, "ses_a")).toBe(1);
+    expect(countInboundDMs(messages, "ses_b")).toBe(1);
+    expect(countInboundDMs(messages, "ses_c")).toBe(0);
+  });
+
+  test("ignores synthetic and non-text parts", () => {
+    const messages = [
+      { parts: [{ type: "text", text: dm("ses_a"), synthetic: true }] },
+      { parts: [{ type: "tool", text: dm("ses_a") }] },
+      { parts: [{ type: "text" }] },
+    ];
+    expect(countInboundDMs(messages, "ses_a")).toBe(0);
+  });
+
+  test("empty or missing parts → 0", () => {
+    expect(countInboundDMs([], "ses_a")).toBe(0);
+    expect(countInboundDMs([{ parts: undefined }], "ses_a")).toBe(0);
+    expect(countInboundDMs([{}], "ses_a")).toBe(0);
+  });
+
+  test("DM_EXCHANGE_LIMIT is a positive cap", () => {
+    expect(DM_EXCHANGE_LIMIT).toBeGreaterThan(0);
   });
 });
 

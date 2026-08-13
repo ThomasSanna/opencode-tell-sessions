@@ -4,8 +4,10 @@ import { z } from "zod";
 import {
   buildSearchResult,
   collectText,
+  countInboundDMs,
   cropExcerpt,
   describeCandidates,
+  DM_EXCHANGE_LIMIT,
   formatDM,
   listRecentHint,
   recentSessions,
@@ -77,7 +79,12 @@ export const plugin: Plugin = async (input) => {
           "Send a direct message (DM) to another OpenCode session on the same server. " +
           "Use this when the user asks to talk to another session " +
           "(e.g. 'ask the frontend session to update the endpoint', 'tell weekly-digest ...'). " +
-          "The message is injected into the target session with the @source-title prefix. " +
+          "The message is injected into the target session with the @source-title prefix plus " +
+          "instructions telling it to answer via session_send when needed and to stop " +
+          "once the exchange has served its purpose, " +
+          "so the conversation can flow both ways without looping. " +
+          "A loop guard refuses to send once two sessions have exchanged " +
+          `${DM_EXCHANGE_LIMIT} DMs. ` +
           "Only send a DM if the user asks for it or if another agent explicitly asked you to reply. " +
           "Do not automatically reply to a received DM, unless the message contains a question or a request for you.",
         args: {
@@ -115,7 +122,37 @@ export const plugin: Plugin = async (input) => {
             const targetSession = resolved.session;
             const sender =
               all.find((s) => s.id === ctx.sessionID)?.title ?? ctx.sessionID;
-            const text = formatDM(sender, args.message);
+
+            try {
+              const [targetMsgs, ownMsgs] = await Promise.all([
+                client.session.messages({
+                  path: { id: targetSession.id },
+                  query: { limit: 100 },
+                  throwOnError: true,
+                }),
+                client.session.messages({
+                  path: { id: ctx.sessionID },
+                  query: { limit: 100 },
+                  throwOnError: true,
+                }),
+              ]);
+              const prior =
+                countInboundDMs(targetMsgs.data ?? [], ctx.sessionID) +
+                countInboundDMs(ownMsgs.data ?? [], targetSession.id);
+              if (prior >= DM_EXCHANGE_LIMIT) {
+                return {
+                  title: "session_send refused",
+                  output:
+                    `Loop protection: you and "${targetSession.title}" have already exchanged ` +
+                    `${prior} DMs (limit ${DM_EXCHANGE_LIMIT}). The conversation should end here — ` +
+                    `do not send further DMs to this session unless the user explicitly asks you to continue.`,
+                };
+              }
+            } catch {
+              // Fail-open: if history can't be read, proceed without the loop guard.
+            }
+
+            const text = formatDM(sender, args.message, ctx.sessionID);
             await client.session.promptAsync({
               path: { id: targetSession.id },
               body: { parts: [{ type: "text", text }] },

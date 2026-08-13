@@ -36,11 +36,53 @@ export function resolveTarget(
   return { kind: "not-found" };
 }
 
-export function formatDM(senderTitle: string, message: string): string {
+export const DM_EXCHANGE_LIMIT = 10;
+
+export type MessageLike = {
+  parts?: readonly { type?: string; text?: string; synthetic?: boolean }[];
+};
+
+/**
+ * Counts direct messages sent by `senderID` that are present in a session's
+ * message history. Each injected DM carries the marker `(id: <senderID>)` in
+ * its instruction block, which makes the count unambiguous across sessions.
+ */
+export function countInboundDMs(
+  messages: readonly MessageLike[],
+  senderID: string,
+): number {
+  const marker = `(id: ${senderID})`;
+  return messages.filter((m) =>
+    (m.parts ?? []).some(
+      (p) =>
+        p.type === "text" &&
+        !p.synthetic &&
+        typeof p.text === "string" &&
+        p.text.includes(marker),
+    ),
+  ).length;
+}
+
+export function formatDM(
+  senderTitle: string,
+  message: string,
+  senderID: string,
+): string {
   const trimmed = senderTitle.trim();
   const source =
     trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
-  return source === "" ? message : `@${source} | ${message}`;
+  const prefix = source === "" ? message : `@${source} | ${message}`;
+  const id = senderID.trim();
+  if (id === "") return prefix;
+  const title = trimmed === "" ? id : trimmed;
+  const block =
+    `Direct message from session "${title}" (id: ${id}). ` +
+    `Reply to the sender using the session_send tool with target "${id}" ` +
+    `(or title "${title}") and your answer as the message. ` +
+    `Reply only when needed — if either side has already gotten what it wanted ` +
+    `from the exchange, let the conversation end there. ` +
+    `If you are replying, do not answer this message normally in this session.`;
+  return `${prefix}\n\n---\n\n${block}`;
 }
 
 export function cropExcerpt(
