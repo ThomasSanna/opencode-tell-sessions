@@ -32,7 +32,7 @@
   "author": "ThomasSanna",
   "repository": {
     "type": "git",
-    "url": "https://github.com/ThomasSanna/opencode-tell-sessions.git"
+    "url": "git+https://github.com/ThomasSanna/opencode-tell-sessions.git"
   },
   "bugs": {
     "url": "https://github.com/ThomasSanna/opencode-tell-sessions/issues"
