@@ -12,7 +12,7 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
         with:
           # Use a PAT (RELEASE_PLEASE_TOKEN) if you want the tag push to
           # re-trigger the publish workflow. With the default GITHUB_TOKEN,
@@ -21,4 +21,5 @@ jobs:
           # "Publish to npm" workflow via workflow_dispatch with the tag.
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           release-type: node
-          bump-minor-pre-major: true
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
