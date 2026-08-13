@@ -76,6 +76,14 @@ describe("formatDM", () => {
     const long = "x".repeat(80);
     expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
   });
+  test("titre de 60 chars exactement → pas de troncature", () => {
+    const exact = "x".repeat(60);
+    expect(formatDM(exact, "hi")).toBe(`@${exact} | hi`);
+  });
+  test("titre de 61 chars → tronqué à 60 + ellipsis", () => {
+    const long = "x".repeat(61);
+    expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
+  });
 });
 
 describe("cropExcerpt", () => {
@@ -93,6 +101,12 @@ describe("cropExcerpt", () => {
   test("texte plus court que maxChars → texte entier sans ellipsis", () => {
     expect(cropExcerpt("frontend ici", "frontend", 300)).toBe("frontend ici");
   });
+  test("query au début du texte → extrait depuis le début", () => {
+    const text = "frontend" + "b".repeat(50);
+    const ex = cropExcerpt(text, "frontend", 30);
+    expect(ex).toContain("frontend");
+    expect(ex!.length).toBeLessThanOrEqual(30);
+  });
 });
 
 describe("collectText", () => {
@@ -103,6 +117,13 @@ describe("collectText", () => {
       { type: "tool", text: "ignored" },
     ];
     expect(collectText(parts)).toBe("a");
+  });
+  test("part text sans champ text → ignorée", () => {
+    const parts = [
+      { type: "text" },
+      { type: "text", text: "ok" },
+    ];
+    expect(collectText(parts)).toBe("ok");
   });
 });
 

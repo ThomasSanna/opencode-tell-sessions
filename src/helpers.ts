@@ -103,6 +103,17 @@ export type SearchHit = {
   excerpt?: string;
 };
 
+export function toHit(s: Session, excerpt?: string): SearchHit {
+  return {
+    sessionID: s.id,
+    title: s.title,
+    created: s.time.created,
+    updated: s.time.updated,
+    directory: s.directory,
+    excerpt,
+  };
+}
+
 export function buildSearchResult(hits: SearchHit[]): string {
   if (hits.length === 0) return "Aucune session ne correspond.";
   const lines: string[] = [];
@@ -119,18 +130,17 @@ export function buildSearchResult(hits: SearchHit[]): string {
   return out.length <= cap ? out : `${out.slice(0, cap - suffix.length)}${suffix}`;
 }
 
+function formatSessionLine(s: Session): string {
+  return `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`;
+}
+
 export function describeCandidates(candidates: Session[]): string {
   if (candidates.length === 0) return "Aucune session ne correspond.";
-  return candidates
-    .map(
-      (s) =>
-        `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`,
-    )
-    .join("\n");
+  return candidates.map(formatSessionLine).join("\n");
 }
 
 export function listRecentHint(sessions: Session[], excludeID?: string): string {
   return recentSessions(sessions, 5, excludeID)
-    .map((s) => `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`)
+    .map(formatSessionLine)
     .join("\n");
 }

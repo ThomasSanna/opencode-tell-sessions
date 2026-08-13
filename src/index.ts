@@ -11,6 +11,7 @@ import {
   recentSessions,
   resolveTarget,
   searchByTitle,
+  toHit,
   fmtTime,
   type SearchHit,
 } from "./helpers.js";
@@ -36,13 +37,7 @@ export const plugin: Plugin = async (input) => {
             const { data: sessions } = await client.session.list({ throwOnError: true });
             const all = sessions ?? [];
             const titleHits = searchByTitle(all, args.query);
-            const hits: SearchHit[] = titleHits.map((s) => ({
-              sessionID: s.id,
-              title: s.title,
-              created: s.time.created,
-              updated: s.time.updated,
-              directory: s.directory,
-            }));
+            const hits: SearchHit[] = titleHits.map((s) => toHit(s));
             const seen = new Set(hits.map((h) => h.sessionID));
             const batch = recentSessions(all, limit, ctx.sessionID).filter(
               (s) => !seen.has(s.id),
@@ -63,14 +58,7 @@ export const plugin: Plugin = async (input) => {
                 } catch {
                   excerpt = undefined;
                 }
-                return {
-                  sessionID: s.id,
-                  title: s.title,
-                  created: s.time.created,
-                  updated: s.time.updated,
-                  directory: s.directory,
-                  excerpt,
-                } satisfies SearchHit;
+                return toHit(s, excerpt);
               }),
             );
             hits.push(...scanned);

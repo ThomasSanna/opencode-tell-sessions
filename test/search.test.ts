@@ -19,14 +19,16 @@ describe("buildSearchResult", () => {
     expect(out).toContain("1970-01-01T00:00:00.100Z");
   });
 
-  test("truncation à 6000 chars", () => {
+  test("truncation à 6000 chars avec suffixe", () => {
     const hits = Array.from({ length: 50 }, (_, i) => ({
       sessionID: `s${i}`,
       title: `titre ${i}` + "x".repeat(200),
       created: 0,
       updated: i,
     }));
-    expect(buildSearchResult(hits).length).toBeLessThanOrEqual(6000);
+    const out = buildSearchResult(hits);
+    expect(out.length).toBeLessThanOrEqual(6000);
+    expect(out.endsWith("… (tronqué)")).toBe(true);
   });
 
   test("résultat vide", () => {
