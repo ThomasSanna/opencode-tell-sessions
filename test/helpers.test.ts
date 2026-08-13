@@ -26,68 +26,68 @@ describe("resolveTarget", () => {
     session("c", "frontend auth", 300),
   ];
 
-  test("UUID direct", () => {
+  test("direct UUID", () => {
     const r = resolveTarget(sessions, "b");
     expect(r.kind).toBe("ok");
     if (r.kind === "ok") expect(r.session.id).toBe("b");
   });
 
-  test("titre exact", () => {
+  test("exact title", () => {
     const r = resolveTarget(sessions, "backend api");
     expect(r.kind).toBe("ok");
     if (r.kind === "ok") expect(r.session.id).toBe("b");
   });
 
-  test("sous-chaîne unique insensible à la casse", () => {
+  test("unique case-insensitive substring", () => {
     const r = resolveTarget(sessions, "BACKEND");
     expect(r.kind).toBe("ok");
     if (r.kind === "ok") expect(r.session.id).toBe("b");
   });
 
-  test("sous-chaîne ambiguë → candidats", () => {
+  test("ambiguous substring → candidates", () => {
     const r = resolveTarget(sessions, "frontend");
     expect(r.kind).toBe("ambiguous");
     if (r.kind === "ambiguous") expect(r.candidates.map((s) => s.id).sort()).toEqual(["a", "c"]);
   });
 
-  test("aucun match", () => {
+  test("no match", () => {
     const r = resolveTarget(sessions, "nope");
     expect(r.kind).toBe("not-found");
   });
 
-  test("target vide ou blanc → not-found", () => {
+  test("empty or blank target → not-found", () => {
     expect(resolveTarget(sessions, "  ").kind).toBe("not-found");
     expect(resolveTarget(sessions, "").kind).toBe("not-found");
   });
 
-  test("cible = expéditeur → self", () => {
+  test("target = sender → self", () => {
     const r = resolveTarget(sessions, "backend api", "b");
     expect(r.kind).toBe("self");
   });
 });
 
 describe("formatDM", () => {
-  test("préfixe @source", () => {
+  test("@source prefix", () => {
     expect(formatDM("user-profiles", "users.name → display_name")).toBe(
       "@user-profiles | users.name → display_name",
     );
   });
-  test("titre source trop long tronqué à 60 chars", () => {
+  test("source title longer than 60 chars is truncated", () => {
     const long = "x".repeat(80);
     expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
   });
-  test("titre de 60 chars exactement → pas de troncature", () => {
+  test("title of exactly 60 chars → no truncation", () => {
     const exact = "x".repeat(60);
     expect(formatDM(exact, "hi")).toBe(`@${exact} | hi`);
   });
-  test("titre de 61 chars → tronqué à 60 + ellipsis", () => {
+  test("title of 61 chars → truncated to 60 + ellipsis", () => {
     const long = "x".repeat(61);
     expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
   });
 });
 
 describe("cropExcerpt", () => {
-  test("extrait autour de la query avec ellipsis", () => {
+  test("excerpt around the query with ellipsis", () => {
     const text = "a".repeat(50) + "frontend" + "b".repeat(50);
     const ex = cropExcerpt(text, "frontend", 30);
     expect(ex).toContain("frontend");
@@ -95,13 +95,13 @@ describe("cropExcerpt", () => {
     expect(ex!.startsWith("…")).toBe(true);
     expect(ex!.endsWith("…")).toBe(true);
   });
-  test("pas de match → undefined", () => {
+  test("no match → undefined", () => {
     expect(cropExcerpt("hello world", "zzz")).toBeUndefined();
   });
-  test("texte plus court que maxChars → texte entier sans ellipsis", () => {
+  test("text shorter than maxChars → full text without ellipsis", () => {
     expect(cropExcerpt("frontend ici", "frontend", 300)).toBe("frontend ici");
   });
-  test("query au début du texte → extrait depuis le début", () => {
+  test("query at the start of the text → excerpt from the start", () => {
     const text = "frontend" + "b".repeat(50);
     const ex = cropExcerpt(text, "frontend", 30);
     expect(ex).toContain("frontend");
@@ -110,7 +110,7 @@ describe("cropExcerpt", () => {
 });
 
 describe("collectText", () => {
-  test("concatène les parts text non-synthetic", () => {
+  test("concatenates non-synthetic text parts", () => {
     const parts = [
       { type: "text", text: "a" },
       { type: "text", text: " b", synthetic: true },
@@ -118,7 +118,7 @@ describe("collectText", () => {
     ];
     expect(collectText(parts)).toBe("a");
   });
-  test("part text sans champ text → ignorée", () => {
+  test("text part without text field → ignored", () => {
     const parts = [
       { type: "text" },
       { type: "text", text: "ok" },
@@ -133,7 +133,7 @@ describe("recentSessions", () => {
     session("b", "mid", 200),
     session("c", "new", 300),
   ];
-  test("top N par updated desc, exclusion optionnelle", () => {
+  test("top N by updated desc, optional exclusion", () => {
     expect(recentSessions(sessions, 2).map((s) => s.id)).toEqual(["c", "b"]);
     expect(recentSessions(sessions, 2, "c").map((s) => s.id)).toEqual(["b", "a"]);
   });
@@ -144,14 +144,14 @@ describe("searchByTitle", () => {
     session("a", "Frontend build", 100),
     session("b", "Backend api", 200),
   ];
-  test("sous-chaîne insensible à la casse", () => {
+  test("case-insensitive substring", () => {
     expect(searchByTitle(sessions, "frontend").map((s) => s.id)).toEqual(["a"]);
     expect(searchByTitle(sessions, "zzz")).toEqual([]);
   });
 });
 
 describe("fmtTime", () => {
-  test("timestamp → ISO court", () => {
+  test("timestamp → short ISO", () => {
     expect(fmtTime(0)).toBe("1970-01-01T00:00:00.000Z");
   });
 });

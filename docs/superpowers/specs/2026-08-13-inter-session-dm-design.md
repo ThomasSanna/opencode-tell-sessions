@@ -1,142 +1,144 @@
-# Design — Plugin OpenCode : messagerie inter-sessions (DM)
+# Design: OpenCode plugin for inter-session messaging (DM)
 
-**Date** : 2026-08-13
-**Statut** : Validé (brainstorming) — en attente de revue du spec
-**Runtime cible** : OpenCode v1 (1.18.x), plugin chargé depuis `.opencode/plugin/`
+**Date**: 2026-08-13
+**Status**: Validated (brainstorming), pending spec review
+**Target runtime**: OpenCode v1 (1.18.x), plugin loaded from `.opencode/plugin/`
 
 ---
 
-## 1. Problème
+## 1. Problem
 
-Dans Claude Code, des sessions nommées peuvent s'envoyer des messages directs (DM) :
-l'agent de la session A peut prévenir l'agent de la session B d'un changement de
-contrat (API, schéma DB, noms de colonnes), sans intervention humaine.
+In Claude Code, named sessions can send each other direct messages (DMs): the
+agent of session A can notify the agent of session B of a contract change (API,
+DB schema, column names), without human intervention.
 
-OpenCode v1 n'a pas cette capacité. Les sessions partagent un serveur commun et
-exposent un client SDK capable d'injecter des messages dans n'importe quelle
-session — la brique existe, il manque le mécanisme.
+OpenCode v1 does not have this capability. Sessions share a common server and
+expose an SDK client able to inject messages into any session: the building
+block exists, the mechanism is missing.
 
-**Objectif** : un plugin qui permet à l'agent d'une session d'envoyer un message
-à une autre session (par titre ambigu, date, ou contenu de transcript), injecté
-dans le transcript cible avec un préfixe `@source`, réveillant l'agent cible.
+**Goal**: a plugin that lets the agent of one session send a message to another
+session (by ambiguous title, date, or transcript content), injected into the
+target transcript with an `@source` prefix, waking up the target agent.
 
-## 2. Décisions de design (validées)
+## 2. Design decisions (validated)
 
-| Question | Décision |
+| Question | Decision |
 |---|---|
-| Runtime | **v1 d'abord** (fonctionne sur OpenCode 1.18.18 installé). Entrée v2 (Plugin.define) hors périmètre de cette itération. |
-| Identité des sessions | **Par titre** (built-in OpenCode, modifiable via /title) + recherche par date + recherche dans le contenu du transcript (croppé). Pas de registre d'alias. |
-| Garde-fous | **Permissions OpenCode standard** (approve/deny/allow sur les outils). Pas de confirmation systématique par DM. |
-| Approche | **Purement outils** : 2 outils (`session_send`, `session_search`), zéro état persistant, tout via le client SDK. |
+| Runtime | **v1 first** (works on the installed OpenCode 1.18.18). v2 entry point (Plugin.define) is out of scope for this iteration. |
+| Session identity | **By title** (OpenCode built-in, changeable via /title) + search by date + search in transcript content (cropped). No alias registry. |
+| Guardrails | **Standard OpenCode permissions** (approve/deny/allow on tools). No systematic DM confirmation. |
+| Approach | **Tools only**: 2 tools (`session_send`, `session_search`), zero persistent state, everything through the SDK client. |
 
 ## 3. Architecture
 
-Un seul fichier : `.opencode/plugin/dm.ts` — module v1 (export `server: Plugin`).
-Types fournis par `@opencode-ai/plugin` (1.18.16, déjà installé dans `.opencode/package.json`).
+A single file: `.opencode/plugin/dm.ts`, a v1 module (`server: Plugin` export).
+Types provided by `@opencode-ai/plugin` (1.18.16, already installed in `.opencode/package.json`).
 
 ```
 ┌─────────────────────┐        ┌─────────────────────┐
 │ Session A (agent)   │        │ Session B (agent)   │
-│  "tell B que ..."   │        │                     │
+│  "tell B that ..."  │        │                     │
 │        │            │        │        ▲            │
 │        ▼            │        │        │            │
-│  tool session_send  │        │ message utilisateur │
-│  tool session_search│        │ "@A | contenu"      │
+│  tool session_send  │        │ user message        │
+│  tool session_search│        │ "@A | content"      │
 │        │            │        │        │            │
 │        └── client.session.prompt(id=B, parts=[text]) ──┘
 │                     │
-│  ── même serveur OpenCode ──
+│  ── same OpenCode server ──
 ```
 
-Tous les sessions du même serveur voient les mêmes outils → bidirectionnel par construction.
+All sessions on the same server see the same tools → bidirectional by
+construction.
 
-### 3.1 Outil `session_search`
+### 3.1 The `session_search` tool
 
-Découverte sémantique. L'agent l'utilise quand l'utilisateur décrit une session
-de façon ambiguë ("la dernière session où on a implémenté une feature côté front").
+Semantic discovery. The agent uses it when the user describes a session
+ambiguously ("the last session where we implemented a front-end feature").
 
-- **Args (zod)** : `query: string`, `limit?: number` (défaut 10)
-- **Logique (déterministe, sans heuristique)** :
-  1. `client.session.list()` → toutes les sessions du serveur
-  2. **Match titre** : sous-chaîne insensible à la casse sur `title` → candidats
-  3. **Match contenu** : dans tous les cas, prend les `limit` sessions les plus
-     récentes (`time.updated` décroissant) et cherche `query` dans leur transcript
-     via `client.session.messages()` → candidats avec extrait
-  4. Fusion des deux listes (dédup par sessionID), les matches titre passent en
-     premier, tri par récence
-  5. **Crop** : chaque extrait de texte ≤ ~300 caractères, sortie totale plafonnée
-     (~6 Ko) pour protéger le contexte de l'agent appelant
-- **Retour** : `[{ sessionID, title, created, updated, directory, excerpt? }]`
-  triés par récence. L'agent juge et choisit.
+- **Args (zod)**: `query: string`, `limit?: number` (default 10)
+- **Logic (deterministic, no heuristics)**:
+  1. `client.session.list()` → all sessions on the server
+  2. **Title match**: case-insensitive substring on `title` → candidates
+  3. **Content match**: in all cases, take the `limit` most recent sessions
+     (`time.updated` descending) and search for `query` in their transcript
+     via `client.session.messages()` → candidates with excerpt
+  4. Merge both lists (dedupe by sessionID), title matches first, sorted by
+     recency
+  5. **Crop**: each text excerpt ≤ ~300 characters, total output capped
+     (~6 KB) to protect the calling agent's context
+- **Return**: `[{ sessionID, title, created, updated, directory, excerpt? }]`
+  sorted by recency. The agent assesses and chooses.
 
-### 3.2 Outil `session_send`
+### 3.2 The `session_send` tool
 
-Envoi d'un DM.
+Sends a DM.
 
-- **Args (zod)** : `target: string` (titre ou sessionID), `message: string`
-- **Logique** :
-  1. Si `target` est un UUID → résolution directe
-  2. Sinon → titre exact → sous-chaîne unique → si plusieurs candidats :
-     **retourner la liste des candidats** (pas de choix arbitraire)
-  3. Résolution du titre de l'expéditeur : `ToolContext.sessionID` →
-     `client.session.list()` → titre (fallback : sessionID brut)
-  4. **Envoi fire-and-forget** : `client.session.prompt({ path: { id }, body: {
-     parts: [{ type: "text", text }] } })` — le tool **n'attend pas** la réponse
-     de la session cible. La promesse est déclenchée en arrière-plan avec un
-     `.catch()` qui log l'échec éventuel (pas d'unhandled rejection).
-  5. Retour immédiat : `DM envoyé à "<titre>" (<id>) à <heure>`
-- **Garde-fou anti-boucle** : refuse `target === sessionID` courant
-  ("Tu es déjà dans cette session")
+- **Args (zod)**: `target: string` (title or sessionID), `message: string`
+- **Logic**:
+  1. If `target` is a UUID → direct resolution
+  2. Otherwise → exact title → unique substring → if several candidates:
+     **return the candidate list** (no arbitrary choice)
+  3. Sender title resolution: `ToolContext.sessionID` →
+     `client.session.list()` → title (fallback: raw sessionID)
+  4. **Fire-and-forget send**: `client.session.prompt({ path: { id }, body: {
+     parts: [{ type: "text", text }] } })` — the tool **does not wait** for the
+     target session's response. The promise is fired in the background with a
+     `.catch()` that logs any failure (no unhandled rejection).
+  5. Immediate return: `DM sent to "<title>" (<id>) at <time>`
+- **Anti-loop guardrail**: refuses `target === current sessionID`
+  ("You are already in this session")
 
-## 4. Format du message injecté
+## 4. Injected message format
 
 ```
 @user-profiles | users.name → users.display_name
 ```
 
-- `@titre-source` → identifie clairement un DM inter-session (exigence "Visible")
-- `|` sépare expéditeur du contenu — format stable et lisible
-- Le message est un vrai message utilisateur : il entre dans le transcript,
-  devient contexte, et **réveille l'agent** de la session cible (comportement
-  exact de l'exemple Claude Code)
+- `@source-title` → clearly identifies an inter-session DM ("Visible"
+  requirement)
+- `|` separates sender from content: a stable, readable format
+- The message is a real user message: it enters the transcript, becomes
+  context, and **wakes up the agent** of the target session (exact behavior of
+  the Claude Code example)
 
-## 5. Instructions agent (descriptions d'outils)
+## 5. Agent instructions (tool descriptions)
 
-- `session_search` : "Recherche une session OpenCode par titre, date ou contenu
-  de conversation. Utilise-le quand l'utilisateur mentionne une autre session de
-  façon ambiguë (ex. 'la dernière session qui parle de frontend')."
-- `session_send` : "Envoie un message direct (DM) à une autre session OpenCode.
-  Utilise-le quand l'utilisateur demande de parler à une autre session (ex.
-  'demande à la session frontend de...', 'tell weekly-digest ...'). N'envoie un
-  DM que si l'utilisateur le demande ou si un autre agent t'a explicitement
-  demandé de répondre. Ne réponds pas automatiquement à un DM reçu, sauf si le
-  message contient une question ou une requête pour toi."
+- `session_search`: "Search for an OpenCode session by title, date, or
+  conversation content. Use it when the user mentions another session
+  ambiguously (e.g. 'the last session that talks about frontend')."
+- `session_send`: "Send a direct message (DM) to another OpenCode session.
+  Use it when the user asks to talk to another session (e.g. 'ask the
+  frontend session to...', 'tell weekly-digest ...'). Only send a DM if the
+  user asks for it or if another agent has explicitly asked you to reply. Do
+  not automatically reply to a received DM unless the message contains a
+  question or a request for you."
 
-## 6. Gestion des erreurs
+## 6. Error handling
 
-| Cas | Comportement |
+| Case | Behavior |
 |---|---|
-| Session cible inexistante | Erreur claire : "Session introuvable. Utilise session_search." + liste des 5 sessions les plus récentes |
-| Titre ambigu (2+ sessions) | Retourne la liste des candidats (titre, id, date maj) — l'agent précise |
-| Recherche sans résultat | Tableau vide + "aucune session ne correspond" |
-| Session cible occupée | Comportement serveur standard : le DM s'ajoute au transcript et sera traité |
-| Échec réseau / serveur down | Erreur retournée au tool → l'agent peut réessayer |
+| Target session missing | Clear error: "Session not found. Use session_search." + list of the 5 most recent sessions |
+| Ambiguous title (2+ sessions) | Returns the candidate list (title, id, last-updated date): the agent narrows it down |
+| Search with no results | Empty array + "no session matches" |
+| Target session busy | Standard server behavior: the DM is added to the transcript and will be processed |
+| Network failure / server down | Error returned to the tool → the agent can retry |
 
-## 7. Test & vérification
+## 7. Test & verification
 
-1. **Build** : `tsc --noEmit` (ou LSP) sur `dm.ts` — types propres, zéro `any`
-2. **Test manuel** :
-   - Ouvrir 2 sessions dans le projet, renommer via `/title` (`user-profiles`, `weekly-digest`)
-   - Session A : "demande à la session weekly-digest de mettre à jour le SQL de weeklyDigest.ts : users.name → users.display_name"
-   - Vérifier : A appelle `session_search` puis `session_send` ; le message apparaît
-     dans B avec préfixe `@user-profiles` ; B réagit et modifie le fichier
-   - Vérifier les cas : titre ambigu, session introuvable
-3. **Charge** : `.opencode/plugin/dm.ts` auto-chargé par OpenCode 1.18.18
+1. **Build**: `tsc --noEmit` (or LSP) on `dm.ts`: clean types, zero `any`
+2. **Manual test**:
+   - Open 2 sessions in the project, rename via `/title` (`user-profiles`, `weekly-digest`)
+   - Session A: "ask the weekly-digest session to update the SQL of weeklyDigest.ts: users.name → users.display_name"
+   - Verify: A calls `session_search` then `session_send`; the message appears
+     in B with the `@user-profiles` prefix; B reacts and modifies the file
+   - Verify the cases: ambiguous title, session not found
+3. **Loading**: `.opencode/plugin/dm.ts` auto-loaded by OpenCode 1.18.18
 
-## 8. Hors périmètre (futur)
+## 8. Out of scope (future)
 
-- Entrée v2 (`Plugin.define` + `ctx.session`) — docs en avance sur les types publiés
-- Registre d'alias stables
-- Commandes slash `/tell`
-- Log des DM entrants (observabilité)
-- Sessions sur des serveurs différents (multi-projets)
+- v2 entry point (`Plugin.define` + `ctx.session`): docs ahead of published types
+- Stable alias registry
+- `/tell` slash command
+- Incoming DM logging (observability)
+- Sessions on different servers (multi-project)

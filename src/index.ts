@@ -23,13 +23,13 @@ export const plugin: Plugin = async (input) => {
     tool: {
       session_search: tool({
         description:
-          "Recherche une session OpenCode par titre, date ou contenu de conversation. " +
-          "Utilise-le quand l'utilisateur mentionne une autre session de façon ambiguë " +
-          "(ex. 'la dernière session qui parle de frontend', 'la session backend'). " +
-          "Retourne les sessions candidates triées par récence avec leur titre, id, date de mise à jour et un extrait.",
+          "Search OpenCode sessions by title, date, or conversation content. " +
+          "Use this when the user mentions another session ambiguously " +
+          "(e.g. 'the last session that talks about frontend', 'the backend session'). " +
+          "Returns candidate sessions sorted by recency with their title, id, last-updated date, and an excerpt.",
         args: {
-          query: z.string().describe("Texte à chercher : titre, mot-clé de contenu, ou description"),
-          limit: z.number().int().positive().max(20).optional().describe("Nombre max de sessions (défaut 10)"),
+          query: z.string().describe("Text to search: title, content keyword, or description"),
+          limit: z.number().int().positive().max(20).optional().describe("Maximum number of sessions (default 10)"),
         },
         async execute(args, ctx) {
           const limit = args.limit ?? 10;
@@ -63,26 +63,26 @@ export const plugin: Plugin = async (input) => {
             );
             hits.push(...scanned);
             hits.sort((a, b) => b.updated - a.updated);
-            return { title: "Sessions trouvées", output: buildSearchResult(hits) };
+            return { title: "Sessions found", output: buildSearchResult(hits) };
           } catch (err) {
             return {
-              title: "Erreur session_search",
-              output: `Impossible de lister les sessions : ${String(err)}`,
+              title: "session_search error",
+              output: `Failed to list sessions: ${String(err)}`,
             };
           }
         },
       }),
       session_send: tool({
         description:
-          "Envoie un message direct (DM) à une autre session OpenCode du même serveur. " +
-          "Utilise-le quand l'utilisateur demande de parler à une autre session " +
-          "(ex. 'demande à la session frontend de...', 'tell weekly-digest ...'). " +
-          "Le message est injecté dans la session cible avec le préfixe @titre-source. " +
-          "N'envoie un DM que si l'utilisateur le demande ou si un autre agent t'a explicitement demandé de répondre. " +
-          "Ne réponds pas automatiquement à un DM reçu, sauf si le message contient une question ou une requête pour toi.",
+          "Send a direct message (DM) to another OpenCode session on the same server. " +
+          "Use this when the user asks to talk to another session " +
+          "(e.g. 'ask the frontend session to update the endpoint', 'tell weekly-digest ...'). " +
+          "The message is injected into the target session with the @source-title prefix. " +
+          "Only send a DM if the user asks for it or if another agent explicitly asked you to reply. " +
+          "Do not automatically reply to a received DM, unless the message contains a question or a request for you.",
         args: {
-          target: z.string().describe("Titre de la session cible (ou son id)"),
-          message: z.string().describe("Contenu du message à envoyer"),
+          target: z.string().describe("Title of the target session (or its id)"),
+          message: z.string().describe("Content of the message to send"),
         },
         async execute(args, ctx) {
           try {
@@ -91,24 +91,24 @@ export const plugin: Plugin = async (input) => {
             const resolved = resolveTarget(all, args.target, ctx.sessionID);
             if (resolved.kind === "self") {
               return {
-                title: "session_send refusé",
-                output: "Tu es déjà dans cette session. Choisis une autre session cible.",
+                title: "session_send refused",
+                output: "You are already in this session. Pick another target session.",
               };
             }
             if (resolved.kind === "not-found") {
               const hint = listRecentHint(all, ctx.sessionID);
               return {
-                title: "Session introuvable",
+                title: "Session not found",
                 output:
-                  `Session "${args.target}" introuvable. Utilise session_search pour trouver la bonne session.\n` +
-                  `Sessions récentes du serveur :\n${hint}`,
+                  `Session "${args.target}" not found. Use session_search to find the right session.\n` +
+                  `Recent sessions on the server:\n${hint}`,
               };
             }
             if (resolved.kind === "ambiguous") {
               return {
-                title: "Session ambiguë",
+                title: "Ambiguous session",
                 output:
-                  `Plusieurs sessions correspondent à "${args.target}". Précise avec un id ou un titre plus exact :\n` +
+                  `Multiple sessions match "${args.target}". Specify a more exact id or title:\n` +
                   describeCandidates(resolved.candidates),
               };
             }
@@ -122,14 +122,14 @@ export const plugin: Plugin = async (input) => {
               throwOnError: true,
             });
             return {
-              title: "DM envoyé",
+              title: "DM sent",
               output:
-                `DM envoyé à "${targetSession.title}" (${targetSession.id}) à ${fmtTime(Date.now())}.`,
+                `DM sent to "${targetSession.title}" (${targetSession.id}) at ${fmtTime(Date.now())}.`,
             };
           } catch (err) {
             return {
-              title: "Erreur session_send",
-              output: `Impossible d'envoyer le DM : ${String(err)}`,
+              title: "session_send error",
+              output: `Failed to send DM: ${String(err)}`,
             };
           }
         },

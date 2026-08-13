@@ -1,6 +1,6 @@
 import type { Session } from "@opencode-ai/sdk";
 
-// Ré-exporté pour que les tests puissent typer leurs fixtures :
+// Re-exported so tests can type their fixtures:
 export type { Session };
 
 export type ResolveResult =
@@ -115,27 +115,27 @@ export function toHit(s: Session, excerpt?: string): SearchHit {
 }
 
 export function buildSearchResult(hits: SearchHit[]): string {
-  if (hits.length === 0) return "Aucune session ne correspond.";
+  if (hits.length === 0) return "No session matches.";
   const lines: string[] = [];
   for (const h of hits) {
     const dir = h.directory ? ` (${h.directory})` : "";
-    const ex = h.excerpt ? `\n    extrait : ${h.excerpt}` : "";
+    const ex = h.excerpt ? `\n    excerpt: ${h.excerpt}` : "";
     lines.push(
-      `- [${h.sessionID}] ${h.title} — maj ${fmtTime(h.updated)}${dir}${ex}`,
+      `- [${h.sessionID}] ${h.title} — updated ${fmtTime(h.updated)}${dir}${ex}`,
     );
   }
   const out = lines.join("\n");
   const cap = 6000;
-  const suffix = "\n… (tronqué)";
+  const suffix = "\n… (truncated)";
   return out.length <= cap ? out : `${out.slice(0, cap - suffix.length)}${suffix}`;
 }
 
 function formatSessionLine(s: Session): string {
-  return `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`;
+  return `- [${s.id}] ${s.title} — updated ${fmtTime(s.time.updated)}`;
 }
 
 export function describeCandidates(candidates: Session[]): string {
-  if (candidates.length === 0) return "Aucune session ne correspond.";
+  if (candidates.length === 0) return "No session matches.";
   return candidates.map(formatSessionLine).join("\n");
 }
 

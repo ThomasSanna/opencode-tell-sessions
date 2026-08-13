@@ -1,71 +1,71 @@
-# Plugin DM inter-sessions — Implementation Plan (layout canonique OSS)
+# Inter-Session DM Plugin: Implementation Plan (canonical OSS layout)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Un plugin OpenCode v1 (`src/index.ts`) qui permet à l'agent d'une session d'envoyer un message direct (DM) à une autre session du même serveur, et de découvrir des sessions par titre ambigu / date / contenu de transcript.
+**Goal:** An OpenCode v1 plugin (`src/index.ts`) that lets the agent of one session send a direct message (DM) to another session on the same server, and discover sessions by ambiguous title / date / transcript content.
 
-**Architecture:** Plugin v1 = fonction `(input) => Promise<Hooks>` recevant le client SDK complet. Deux outils enregistrés via `Hooks.tool` : `session_search` (découverte : match titre + match contenu avec crop) et `session_send` (envoi fire-and-forget via `client.session.promptAsync`, préfixe `@source | message`). Logique pure (résolution de cible, formatage, crop, tri) exportée depuis `src/index.ts` et testée en unitaire via `bun test`. Zéro état persistant. Layout repo canonique OSS (zéro-build TS, comme `opencode-command-inject` / `opencode-wakatime`) : source en `src/`, pas de build, OpenCode charge le TS directement via Bun.
+**Architecture:** v1 plugin = function `(input) => Promise<Hooks>` receiving the full SDK client. Two tools registered via `Hooks.tool`: `session_search` (discovery: title match + content match with crop) and `session_send` (fire-and-forget send via `client.session.promptAsync`, `@source | message` prefix). Pure logic (target resolution, formatting, crop, sorting) exported from `src/index.ts` and unit-tested via `bun test`. Zero persistent state. Canonical OSS repo layout (zero-build TS, like `opencode-command-inject` / `opencode-wakatime`): source in `src/`, no build, OpenCode loads the TS directly via Bun.
 
-**Tech Stack:** TypeScript strict, `@opencode-ai/plugin@1.18.16`, `@opencode-ai/sdk@1.18.16`, `zod@4`, Bun 1.3.14 (tests + typecheck), git (repo initialisé en Task 0).
+**Tech Stack:** Strict TypeScript, `@opencode-ai/plugin@1.18.16`, `@opencode-ai/sdk@1.18.16`, `zod@4`, Bun 1.3.14 (tests + typecheck), git (repo initialized in Task 0).
 
 ## Global Constraints
 
-- **Repo : `E:\programmes\apps\opencode-plugins`** — la racine EST le package du plugin. Layout canonique OSS :
+- **Repo: `E:\programmes\apps\opencode-plugins`** — the root IS the plugin package. Canonical OSS layout:
   ```
-  src/index.ts            ← entrée du plugin (export const plugin + export default)
-  test/*.test.ts          ← tests bun (import depuis ../src/index)
+  src/index.ts            ← plugin entry point (export const plugin + export default)
+  test/*.test.ts          ← bun tests (import from ../src/index)
   package.json            ← name: opencode-inter-session-dm, zero-build TS
   tsconfig.json           ← strict, noEmit, moduleResolution bundler
-  opencode.json           ← dev local : "plugin": ["./src/index.ts"]
+  opencode.json           ← local dev: "plugin": ["./src/index.ts"]
   README.md, LICENSE, .gitignore
-  docs/superpowers/       ← spec + plan (committés)
+  docs/superpowers/       ← spec + plan (committed)
   ```
-- **Git OBLIGATOIRE** : le repo est initialisé en Task 0. Chaque tâche se termine par un commit (`git add` + `git commit`). Pas de repo = pas de tâche terminée.
-- `.gitignore` racine : `node_modules/`, `dist/`, `*.log`, `.DS_Store`, `.opencode/`, `.omo/`, `.codegraph/` — l'ancien scaffold `.opencode/` (package.json + node_modules de l'ancien layout) est **supprimé** en Task 0.
-- Export convention OSS (wakatime) : `export const plugin: Plugin = async (input) => {...}; export default plugin;` — PAS `export const Plugin`.
-- Runtime cible : OpenCode v1 1.18.18, chargé via `opencode.json` → `"plugin": ["./src/index.ts"]`. API v2 hors périmètre.
-- Zéro état persistant : pas de registre, pas de fichier de config, pas de cache sur disque.
-- Zéro `any`, zéro `@ts-ignore`/`@ts-expect-error`, `strict: true`.
-- Tous les appels client passent `{ throwOnError: true }` (rejet en cas d'erreur HTTP) — le code attrape les erreurs et les convertit en messages pour l'agent.
-- **Déviation spec documentée** : le spec dit `client.session.prompt(...)` + `.catch()`. Le SDK expose `client.session.promptAsync` ("create and send a new message... return immediately", HTTP 204) — c'est le fire-and-forget natif, plus propre. Le plan l'utilise.
-- L'utilisateur a validé (brainstorming) : identité par titre/date/contenu, permissions OpenCode standard, approche purement outils, layout canonique OSS.
+- **Git REQUIRED**: the repo is initialized in Task 0. Each task ends with a commit (`git add` + `git commit`). No repo = no completed task.
+- Root `.gitignore`: `node_modules/`, `dist/`, `*.log`, `.DS_Store`, `.opencode/`, `.omo/`, `.codegraph/`; the old `.opencode/` scaffold (package.json + node_modules from the old layout) is **deleted** in Task 0.
+- OSS export convention (wakatime): `export const plugin: Plugin = async (input) => {...}; export default plugin;` — NOT `export const Plugin`.
+- Target runtime: OpenCode v1 1.18.18, loaded via `opencode.json` → `"plugin": ["./src/index.ts"]`. v2 API out of scope.
+- Zero persistent state: no registry, no config file, no on-disk cache.
+- Zero `any`, zero `@ts-ignore`/`@ts-expect-error`, `strict: true`.
+- All client calls pass `{ throwOnError: true }` (rejects on HTTP error); the code catches errors and converts them into messages for the agent.
+- **Documented spec deviation**: the spec says `client.session.prompt(...)` + `.catch()`. The SDK exposes `client.session.promptAsync` ("create and send a new message... return immediately", HTTP 204): the native fire-and-forget, cleaner. The plan uses it.
+- The user validated (brainstorming): identity by title/date/content, standard OpenCode permissions, tools-only approach, canonical OSS layout.
 
 ---
 
-### Task 0: Repo setup — git init + scaffold canonique OSS
+### Task 0: Repo setup: git init + canonical OSS scaffold
 
 **Files:**
 - Create: `.gitignore`
 - Create: `LICENSE` (MIT)
 - Create: `README.md`
-- Create: `opencode.json` (dev local)
-- Create: `package.json` (canonique, zéro-build)
-- Delete: `.opencode/` (ancien scaffold : package.json, package-lock.json, node_modules, plugin/) — remplacé par la racine
-- Commit: tout + `docs/superpowers/` (spec + plan déjà écrits)
+- Create: `opencode.json` (local dev)
+- Create: `package.json` (canonical, zero-build)
+- Delete: `.opencode/` (old scaffold: package.json, package-lock.json, node_modules, plugin/), replaced by the root
+- Commit: everything + `docs/superpowers/` (spec + plan already written)
 
 **Interfaces:**
-- Consumes: rien.
-- Produces: repo git initialisé (branche `main`), commit initial avec scaffold + spec + plan. Base `HEAD` pour toutes les tâches suivantes.
+- Consumes: nothing.
+- Produces: initialized git repo (`main` branch), initial commit with scaffold + spec + plan. `HEAD` base for all subsequent tasks.
 
-- [ ] **Step 1: Supprimer l'ancien scaffold `.opencode/`**
+- [ ] **Step 1: Delete the old `.opencode/` scaffold**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`):
 ```
 Remove-Item -Recurse -Force .opencode
 ```
-Expected: le dossier `.opencode/` (package.json 1.18.16, node_modules, plugin/ vide) disparaît. Il est remplacé par le layout canonique à la racine.
+Expected: the `.opencode/` folder (package.json 1.18.16, node_modules, empty plugin/) disappears. It is replaced by the canonical layout at the root.
 
-- [ ] **Step 2: Initialiser le repo git**
+- [ ] **Step 2: Initialize the git repo**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`):
 ```
 git init -b main
 ```
-Expected: `Initialized empty Git repository`. Vérifier : `git branch --show-current` → `main`.
+Expected: `Initialized empty Git repository`. Verify: `git branch --show-current` → `main`.
 
-- [ ] **Step 3: Créer `.gitignore`**
+- [ ] **Step 3: Create `.gitignore`**
 
-Créer `.gitignore` :
+Create `.gitignore`:
 
 ```
 node_modules/
@@ -77,9 +77,9 @@ dist/
 .codegraph/
 ```
 
-- [ ] **Step 4: Créer `LICENSE` (MIT)**
+- [ ] **Step 4: Create `LICENSE` (MIT)**
 
-Créer `LICENSE` :
+Create `LICENSE`:
 
 ```
 MIT License
@@ -105,11 +105,11 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-Note : l'auteur est un placeholder — l'utilisateur le remplacera avant publication.
+Note: the author is a placeholder; the user will replace it before publishing.
 
-- [ ] **Step 5: Créer `package.json` (canonique, zéro-build TS)**
+- [ ] **Step 5: Create `package.json` (canonical, zero-build TS)**
 
-Créer `package.json` :
+Create `package.json`:
 
 ```json
 {
@@ -143,16 +143,16 @@ Créer `package.json` :
 }
 ```
 
-Note : zéro-build — `main`/`exports` pointent le TS directement (OpenCode charge avec Bun, comme `opencode-command-inject`). `@opencode-ai/sdk` et `zod` sont des dépendances explicites (importés directement par le plugin). `@opencode-ai/plugin` est peer (convention wakatime/openspec) + dev pour le typecheck.
+Note: zero-build: `main`/`exports` point directly at the TS (OpenCode loads it with Bun, like `opencode-command-inject`). `@opencode-ai/sdk` and `zod` are explicit dependencies (imported directly by the plugin). `@opencode-ai/plugin` is peer (wakatime/openspec convention) + dev for typecheck.
 
-- [ ] **Step 6: Installer les dépendances**
+- [ ] **Step 6: Install dependencies**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun install`
-Expected: install ok, `node_modules/@opencode-ai/plugin`, `node_modules/zod`, `node_modules/@opencode-ai/sdk`, `node_modules/typescript` existent. `bun.lock` créé.
+Expected: install ok; `node_modules/@opencode-ai/plugin`, `node_modules/zod`, `node_modules/@opencode-ai/sdk`, `node_modules/typescript` exist. `bun.lock` created.
 
-- [ ] **Step 7: Créer `opencode.json` (dev local)**
+- [ ] **Step 7: Create `opencode.json` (local dev)**
 
-Créer `opencode.json` :
+Create `opencode.json`:
 
 ```json
 {
@@ -161,22 +161,22 @@ Créer `opencode.json` :
 }
 ```
 
-Note : c'est la config de DÉVELOPPEMENT de ce repo. Les consommateurs du plugin publié mettront `"plugin": ["opencode-inter-session-dm"]` dans LEUR config (documenté dans le README). Si le loader refuse `"./src/index.ts"` (voir Task 5), essayer `"plugin": ["./"]` (résolution via package.json `main`).
+Note: this is this repo's DEVELOPMENT config. Consumers of the published plugin will put `"plugin": ["opencode-inter-session-dm"]` in THEIR config (documented in the README). If the loader rejects `"./src/index.ts"` (see Task 5), try `"plugin": ["./"]` (resolution via package.json `main`).
 
-- [ ] **Step 8: Créer `README.md`**
+- [ ] **Step 8: Create `README.md`**
 
-Créer `README.md` :
+Create `README.md`:
 
 ```markdown
 # opencode-inter-session-dm
 
-Messagerie directe (DM) inter-sessions pour OpenCode : les agents de sessions
-différentes du même serveur peuvent se parler en temps réel, sans intervention
-humaine.
+Inter-session direct messaging (DM) for OpenCode: agents in different sessions
+on the same server can talk to each other in real time, without human
+intervention.
 
 ## Installation
 
-Ajoutez le plugin à votre `opencode.json` :
+Add the plugin to your `opencode.json`:
 
 ```json
 {
@@ -184,78 +184,78 @@ Ajoutez le plugin à votre `opencode.json` :
 }
 ```
 
-## Utilisation
+## Usage
 
-Depuis n'importe quelle session, demandez à l'agent de parler à une autre
-session — par titre, date ou contenu de conversation :
+From any session, ask the agent to talk to another session, by title, date, or
+conversation content:
 
-- « demande à la session frontend de mettre à jour le endpoint »
-- « tell weekly-digest we renamed users.name to display_name »
-- « trouve la dernière session qui parle de weeklyDigest et envoie-lui ce message »
+- "ask the frontend session to update the endpoint"
+- "tell weekly-digest we renamed users.name to display_name"
+- "find the latest session that talks about weeklyDigest and send it this message"
 
-L'agent utilise `session_search` pour trouver la bonne session, puis
-`session_send` pour lui envoyer un message. Le message apparaît dans la
-session cible avec le préfixe `@titre-source`.
+The agent uses `session_search` to find the right session, then
+`session_send` to send it a message. The message appears in the
+target session with the `@source-title` prefix.
 
-## Développement
+## Development
 
 ```bash
 bun install
-bun test        # tests unitaires
+bun test        # unit tests
 bun run typecheck
 ```
 
-## Licence
+## License
 
 MIT
 ```
 
-- [ ] **Step 9: Commit initial**
+- [ ] **Step 9: Initial commit**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`):
 ```
 git add -A
 git commit -m "chore: init opencode-inter-session-dm plugin (canonical OSS layout)"
 ```
-Expected: commit créé avec .gitignore, LICENSE, README.md, opencode.json, package.json, bun.lock, docs/superpowers/. Vérifier : `git log --oneline` → 1 commit. `git status` propre.
+Expected: commit created with .gitignore, LICENSE, README.md, opencode.json, package.json, bun.lock, docs/superpowers/. Verify: `git log --oneline` → 1 commit. `git status` clean.
 
 ---
 
-### Task 1: Scaffold — tsconfig + typecheck + squelette de plugin
+### Task 1: Scaffold: tsconfig + typecheck + plugin skeleton
 
 **Files:**
 - Create: `tsconfig.json`
-- Create: `src/index.ts` (squelette compilable)
+- Create: `src/index.ts` (compilable skeleton)
 - Test: `test/smoke.test.ts`
 
 **Interfaces:**
-- Consumes: repo git + package.json (Task 0).
-- Produces: `src/index.ts` exporte `plugin` (type `Plugin` de `@opencode-ai/plugin`) + `export default plugin`. Tâches suivantes ajoutent des exports au même fichier.
+- Consumes: git repo + package.json (Task 0).
+- Produces: `src/index.ts` exports `plugin` (type `Plugin` from `@opencode-ai/plugin`) + `export default plugin`. Subsequent tasks add exports to the same file.
 
-- [ ] **Step 1: Écrire le test qui échoue**
+- [ ] **Step 1: Write the failing test**
 
-Créer `test/smoke.test.ts` :
+Create `test/smoke.test.ts`:
 
 ```ts
 import { describe, expect, test } from "bun:test";
 import plugin, { plugin as named } from "../src/index";
 
 describe("smoke", () => {
-  test("le module exporte le plugin (named + default)", () => {
+  test("the module exports the plugin (named + default)", () => {
     expect(typeof named).toBe("function");
     expect(plugin).toBe(named);
   });
 });
 ```
 
-- [ ] **Step 2: Exécuter pour voir échouer**
+- [ ] **Step 2: Run it to see it fail**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/smoke.test.ts`
 Expected: FAIL — "Cannot find module '../src/index'".
 
-- [ ] **Step 3: Créer le tsconfig**
+- [ ] **Step 3: Create the tsconfig**
 
-Créer `tsconfig.json` :
+Create `tsconfig.json`:
 
 ```json
 {
@@ -272,11 +272,11 @@ Créer `tsconfig.json` :
 }
 ```
 
-Note : `skipLibCheck: true` évite les erreurs dans les .d.ts générés de `@opencode-ai/sdk`. `types: []` évite la dépendance à `@types/node`. Les tests sont exclus du typecheck (vérifiés par leur exécution sous bun).
+Note: `skipLibCheck: true` avoids errors in `@opencode-ai/sdk`'s generated .d.ts files. `types: []` avoids the `@types/node` dependency. Tests are excluded from typecheck (verified by running them under bun).
 
-- [ ] **Step 4: Créer le squelette du plugin**
+- [ ] **Step 4: Create the plugin skeleton**
 
-Créer `src/index.ts` :
+Create `src/index.ts`:
 
 ```ts
 import { type Plugin } from "@opencode-ai/plugin";
@@ -290,15 +290,15 @@ export const plugin: Plugin = async () => {
 export default plugin;
 ```
 
-- [ ] **Step 5: Exécuter pour voir passer**
+- [ ] **Step 5: Run it to see it pass**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/smoke.test.ts`
 Expected: PASS (1 test).
 
-- [ ] **Step 6: Vérifier le typecheck**
+- [ ] **Step 6: Verify the typecheck**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bunx tsc --noEmit`
-Expected: exit 0, aucune sortie.
+Expected: exit 0, no output.
 
 - [ ] **Step 7: Commit**
 
@@ -309,15 +309,15 @@ git commit -m "chore: scaffold plugin with typecheck and smoke test"
 
 ---
 
-### Task 2: Helpers purs — résolution de cible, format DM, crop
+### Task 2: Pure helpers: target resolution, DM format, crop
 
 **Files:**
-- Modify: `src/index.ts` (ajout exports purs)
+- Modify: `src/index.ts` (add pure exports)
 - Test: `test/helpers.test.ts`
 
 **Interfaces:**
-- Consumes: rien (fonctions pures, `Session` type-only).
-- Produces (exports nommés de `src/index.ts`, utilisés par Task 3 & 4 et par les tests) :
+- Consumes: nothing (pure functions, `Session` type-only).
+- Produces (named exports from `src/index.ts`, used by Tasks 3 & 4 and by the tests):
   - `type ResolveResult = { kind: "ok"; session: Session } | { kind: "ambiguous"; candidates: Session[] } | { kind: "self" } | { kind: "not-found" }`
   - `resolveTarget(sessions: Session[], target: string, senderID?: string): ResolveResult`
   - `formatDM(senderTitle: string, message: string): string`
@@ -326,11 +326,11 @@ git commit -m "chore: scaffold plugin with typecheck and smoke test"
   - `recentSessions(sessions: Session[], limit: number, excludeID?: string): Session[]`
   - `searchByTitle(sessions: Session[], query: string): Session[]`
   - `fmtTime(ts: number): string`
-  - `export type { Session }` (ré-export pour les fixtures de tests)
+  - `export type { Session }` (re-export for test fixtures)
 
-- [ ] **Step 1: Écrire les tests qui échouent**
+- [ ] **Step 1: Write the failing tests**
 
-Créer `test/helpers.test.ts` :
+Create `test/helpers.test.ts`:
 
 ```ts
 import { describe, expect, test } from "bun:test";
@@ -361,55 +361,55 @@ describe("resolveTarget", () => {
     session("c", "frontend auth", 300),
   ];
 
-  test("UUID direct", () => {
+  test("direct UUID", () => {
     const r = resolveTarget(sessions, "b");
     expect(r.kind).toBe("ok");
     if (r.kind === "ok") expect(r.session.id).toBe("b");
   });
 
-  test("titre exact", () => {
+  test("exact title", () => {
     const r = resolveTarget(sessions, "backend api");
     expect(r.kind).toBe("ok");
     if (r.kind === "ok") expect(r.session.id).toBe("b");
   });
 
-  test("sous-chaîne unique insensible à la casse", () => {
+  test("unique case-insensitive substring", () => {
     const r = resolveTarget(sessions, "BACKEND");
     expect(r.kind).toBe("ok");
     if (r.kind === "ok") expect(r.session.id).toBe("b");
   });
 
-  test("sous-chaîne ambiguë → candidats", () => {
+  test("ambiguous substring → candidates", () => {
     const r = resolveTarget(sessions, "frontend");
     expect(r.kind).toBe("ambiguous");
     if (r.kind === "ambiguous") expect(r.candidates.map((s) => s.id).sort()).toEqual(["a", "c"]);
   });
 
-  test("aucun match", () => {
+  test("no match", () => {
     const r = resolveTarget(sessions, "nope");
     expect(r.kind).toBe("not-found");
   });
 
-  test("cible = expéditeur → self", () => {
+  test("target = sender → self", () => {
     const r = resolveTarget(sessions, "backend api", "b");
     expect(r.kind).toBe("self");
   });
 });
 
 describe("formatDM", () => {
-  test("préfixe @source", () => {
+  test("@source prefix", () => {
     expect(formatDM("user-profiles", "users.name → display_name")).toBe(
       "@user-profiles | users.name → display_name",
     );
   });
-  test("titre source trop long tronqué à 60 chars", () => {
+  test("source title too long, truncated to 60 chars", () => {
     const long = "x".repeat(80);
     expect(formatDM(long, "hi")).toBe(`@${"x".repeat(60)}… | hi`);
   });
 });
 
 describe("cropExcerpt", () => {
-  test("extrait autour de la query avec ellipsis", () => {
+  test("excerpt around the query with ellipsis", () => {
     const text = "a".repeat(50) + "frontend" + "b".repeat(50);
     const ex = cropExcerpt(text, "frontend", 30);
     expect(ex).toContain("frontend");
@@ -417,16 +417,16 @@ describe("cropExcerpt", () => {
     expect(ex!.startsWith("…")).toBe(true);
     expect(ex!.endsWith("…")).toBe(true);
   });
-  test("pas de match → undefined", () => {
+  test("no match → undefined", () => {
     expect(cropExcerpt("hello world", "zzz")).toBeUndefined();
   });
-  test("texte plus court que maxChars → texte entier sans ellipsis", () => {
-    expect(cropExcerpt("frontend ici", "frontend", 300)).toBe("frontend ici");
+  test("text shorter than maxChars → full text without ellipsis", () => {
+    expect(cropExcerpt("frontend here", "frontend", 300)).toBe("frontend here");
   });
 });
 
 describe("collectText", () => {
-  test("concatène les parts text non-synthetic", () => {
+  test("concatenates non-synthetic text parts", () => {
     const parts = [
       { type: "text", text: "a" },
       { type: "text", text: " b", synthetic: true },
@@ -442,7 +442,7 @@ describe("recentSessions", () => {
     session("b", "mid", 200),
     session("c", "new", 300),
   ];
-  test("top N par updated desc, exclusion optionnelle", () => {
+  test("top N by updated desc, optional exclusion", () => {
     expect(recentSessions(sessions, 2).map((s) => s.id)).toEqual(["c", "b"]);
     expect(recentSessions(sessions, 2, "c").map((s) => s.id)).toEqual(["b", "a"]);
   });
@@ -453,32 +453,32 @@ describe("searchByTitle", () => {
     session("a", "Frontend build", 100),
     session("b", "Backend api", 200),
   ];
-  test("sous-chaîne insensible à la casse", () => {
+  test("case-insensitive substring", () => {
     expect(searchByTitle(sessions, "frontend").map((s) => s.id)).toEqual(["a"]);
     expect(searchByTitle(sessions, "zzz")).toEqual([]);
   });
 });
 
 describe("fmtTime", () => {
-  test("timestamp → ISO court", () => {
+  test("timestamp → short ISO", () => {
     expect(fmtTime(0)).toBe("1970-01-01T00:00:00.000Z");
   });
 });
 ```
 
-- [ ] **Step 2: Exécuter pour voir échouer**
+- [ ] **Step 2: Run it to see it fail**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/helpers.test.ts`
-Expected: FAIL — erreurs "does not provide an export named" pour tous les imports de `../src/index`.
+Expected: FAIL — "does not provide an export named" errors for all imports from `../src/index`.
 
-- [ ] **Step 3: Implémenter les helpers**
+- [ ] **Step 3: Implement the helpers**
 
-Ajouter en tête de `src/index.ts` (avant le `export const plugin`) :
+Add at the top of `src/index.ts` (before the `export const plugin`):
 
 ```ts
 import type { Session } from "@opencode-ai/sdk";
 
-// Ré-exporté pour que les tests puissent typer leurs fixtures :
+// Re-exported so tests can type their fixtures:
 export type { Session };
 
 export type ResolveResult =
@@ -557,10 +557,10 @@ export function fmtTime(ts: number): string {
 }
 ```
 
-- [ ] **Step 4: Exécuter pour voir passer**
+- [ ] **Step 4: Run it to see it pass**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/helpers.test.ts`
-Expected: PASS (tous les tests).
+Expected: PASS (all tests).
 
 - [ ] **Step 5: Typecheck**
 
@@ -571,31 +571,31 @@ Expected: exit 0.
 
 ```bash
 git add src/index.ts test/helpers.test.ts
-git commit -m "feat: dm helpers purs (resolve, format, crop, search)"
+git commit -m "feat: pure dm helpers (resolve, format, crop, search)"
 ```
 
 ---
 
-### Task 3: Outil `session_search` — découverte des sessions
+### Task 3: The `session_search` tool: session discovery
 
 **Files:**
-- Modify: `src/index.ts` (implémentation de `buildSearchResult` + enregistrement du tool)
+- Modify: `src/index.ts` (implement `buildSearchResult` + register the tool)
 - Test: `test/search.test.ts`
 
 **Interfaces:**
-- Consumes: helpers de Task 2 (`searchByTitle`, `recentSessions`, `collectText`, `cropExcerpt`, `fmtTime`), types `Session`/`Part` du SDK, `tool` de `@opencode-ai/plugin/tool`, `ToolContext`.
-- Produces: export nommé `buildSearchResult(hits: SearchHit[]): string` où `SearchHit = { sessionID: string; title: string; created: number; updated: number; directory?: string; excerpt?: string }`. Utilisé par le tool et testé. Le tool `session_search` est enregistré dans `Hooks.tool`.
+- Consumes: Task 2 helpers (`searchByTitle`, `recentSessions`, `collectText`, `cropExcerpt`, `fmtTime`), `Session`/`Part` types from the SDK, `tool` from `@opencode-ai/plugin/tool`, `ToolContext`.
+- Produces: named export `buildSearchResult(hits: SearchHit[]): string` where `SearchHit = { sessionID: string; title: string; created: number; updated: number; directory?: string; excerpt?: string }`. Used by the tool and tested. The `session_search` tool is registered in `Hooks.tool`.
 
-- [ ] **Step 1: Écrire les tests qui échouent**
+- [ ] **Step 1: Write the failing tests**
 
-Créer `test/search.test.ts` :
+Create `test/search.test.ts`:
 
 ```ts
 import { describe, expect, test } from "bun:test";
 import { buildSearchResult } from "../src/index";
 
 describe("buildSearchResult", () => {
-  test("liste lisible avec excerpt optionnel", () => {
+  test("readable list with optional excerpt", () => {
     const out = buildSearchResult([
       {
         sessionID: "a",
@@ -612,30 +612,30 @@ describe("buildSearchResult", () => {
     expect(out).toContain("1970-01-01T00:00:00.100Z");
   });
 
-  test("truncation à 6000 chars", () => {
+  test("truncation at 6000 chars", () => {
     const hits = Array.from({ length: 50 }, (_, i) => ({
       sessionID: `s${i}`,
-      title: `titre ${i}` + "x".repeat(200),
+      title: `title ${i}` + "x".repeat(200),
       created: 0,
       updated: i,
     }));
     expect(buildSearchResult(hits).length).toBeLessThanOrEqual(6000);
   });
 
-  test("résultat vide", () => {
-    expect(buildSearchResult([])).toBe("Aucune session ne correspond.");
+  test("empty result", () => {
+    expect(buildSearchResult([])).toBe("No session matches.");
   });
 });
 ```
 
-- [ ] **Step 2: Exécuter pour voir échouer**
+- [ ] **Step 2: Run it to see it fail**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/search.test.ts`
 Expected: FAIL — "does not provide an export named buildSearchResult".
 
-- [ ] **Step 3: Implémenter `buildSearchResult` + enregistrer le tool**
+- [ ] **Step 3: Implement `buildSearchResult` + register the tool**
 
-Ajouter dans `src/index.ts` :
+Add in `src/index.ts`:
 
 ```ts
 import { tool } from "@opencode-ai/plugin/tool";
@@ -651,23 +651,23 @@ export type SearchHit = {
 };
 
 export function buildSearchResult(hits: SearchHit[]): string {
-  if (hits.length === 0) return "Aucune session ne correspond.";
+  if (hits.length === 0) return "No session matches.";
   const lines: string[] = [];
   for (const h of hits) {
     const dir = h.directory ? ` (${h.directory})` : "";
-    const ex = h.excerpt ? `\n    extrait : ${h.excerpt}` : "";
+    const ex = h.excerpt ? `\n    excerpt: ${h.excerpt}` : "";
     lines.push(
-      `- [${h.sessionID}] ${h.title} — maj ${fmtTime(h.updated)}${dir}${ex}`,
+      `- [${h.sessionID}] ${h.title} — updated ${fmtTime(h.updated)}${dir}${ex}`,
     );
   }
   const out = lines.join("\n");
   const cap = 6000;
-  const suffix = "\n… (tronqué)";
+  const suffix = "\n… (truncated)";
   return out.length <= cap ? out : `${out.slice(0, cap - suffix.length)}${suffix}`;
 }
 ```
 
-Puis remplacer le corps du `plugin` pour enregistrer `session_search` (implémentation complète — Task 4 ajoutera `session_send` dans le même objet `tool`) :
+Then replace the body of the `plugin` to register `session_search` (full implementation — Task 4 will add `session_send` to the same `tool` object):
 
 ```ts
 export const plugin: Plugin = async (input) => {
@@ -677,13 +677,13 @@ export const plugin: Plugin = async (input) => {
     tool: {
       session_search: tool({
         description:
-          "Recherche une session OpenCode par titre, date ou contenu de conversation. " +
-          "Utilise-le quand l'utilisateur mentionne une autre session de façon ambiguë " +
-          "(ex. 'la dernière session qui parle de frontend', 'la session backend'). " +
-          "Retourne les sessions candidates triées par récence avec leur titre, id, date de mise à jour et un extrait.",
+          "Search for an OpenCode session by title, date, or conversation content. " +
+          "Use it when the user mentions another session ambiguously " +
+          "(e.g. 'the last session that talks about frontend', 'the backend session'). " +
+          "Returns candidate sessions sorted by recency, with their title, id, last-updated date and an excerpt.",
         args: {
-          query: z.string().describe("Texte à chercher : titre, mot-clé de contenu, ou description"),
-          limit: z.number().int().positive().max(20).optional().describe("Nombre max de sessions (défaut 10)"),
+          query: z.string().describe("Text to search for: title, content keyword, or description"),
+          limit: z.number().int().positive().max(20).optional().describe("Max number of sessions (default 10)"),
         },
         async execute(args, ctx) {
           const limit = args.limit ?? 10;
@@ -726,11 +726,11 @@ export const plugin: Plugin = async (input) => {
               seen.add(s.id);
             }
             hits.sort((a, b) => b.updated - a.updated);
-            return { title: "Sessions trouvées", output: buildSearchResult(hits) };
+            return { title: "Sessions found", output: buildSearchResult(hits) };
           } catch (err) {
             return {
-              title: "Erreur session_search",
-              output: `Impossible de lister les sessions : ${String(err)}`,
+              title: "session_search error",
+              output: `Could not list sessions: ${String(err)}`,
             };
           }
         },
@@ -740,9 +740,9 @@ export const plugin: Plugin = async (input) => {
 };
 ```
 
-Note : `ToolContext.sessionID` vient de `@opencode-ai/plugin/tool` (type inféré par `tool()`). `m.parts` est typé `Part[]` — compatible avec le paramètre `readonly { type?; text?; synthetic? }[]` de `collectText` (les `Part` du SDK sont une union avec `type: string`).
+Note: `ToolContext.sessionID` comes from `@opencode-ai/plugin/tool` (type inferred by `tool()`). `m.parts` is typed `Part[]`, compatible with `collectText`'s `readonly { type?; text?; synthetic? }[]` parameter (the SDK `Part`s are a union with `type: string`).
 
-- [ ] **Step 4: Exécuter pour voir passer**
+- [ ] **Step 4: Run it to see it pass**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/search.test.ts`
 Expected: PASS.
@@ -756,24 +756,24 @@ Expected: exit 0.
 
 ```bash
 git add src/index.ts test/search.test.ts
-git commit -m "feat: tool session_search (titre + contenu croppé)"
+git commit -m "feat: session_search tool (title + cropped content)"
 ```
 
 ---
 
-### Task 4: Outil `session_send` — envoi du DM
+### Task 4: The `session_send` tool: sending DMs
 
 **Files:**
-- Modify: `src/index.ts` (enregistrement du tool `session_send`)
+- Modify: `src/index.ts` (register the `session_send` tool)
 - Test: `test/send.test.ts`
 
 **Interfaces:**
-- Consumes: `resolveTarget`, `formatDM`, `recentSessions`, `fmtTime`, `buildSearchResult`, `type SearchHit` (Task 2 & 3), `ToolContext`.
-- Produces: le tool `session_send` dans `Hooks.tool` (utilisé par l'agent). Exports testés : `describeCandidates(candidates: Session[]): string` et `listRecentHint(sessions: Session[]): string`.
+- Consumes: `resolveTarget`, `formatDM`, `recentSessions`, `fmtTime`, `buildSearchResult`, `type SearchHit` (Tasks 2 & 3), `ToolContext`.
+- Produces: the `session_send` tool in `Hooks.tool` (used by the agent). Tested exports: `describeCandidates(candidates: Session[]): string` and `listRecentHint(sessions: Session[]): string`.
 
-- [ ] **Step 1: Écrire les tests qui échouent**
+- [ ] **Step 1: Write the failing tests**
 
-Créer `test/send.test.ts` :
+Create `test/send.test.ts`:
 
 ```ts
 import { describe, expect, test } from "bun:test";
@@ -793,19 +793,19 @@ const session = (id: string, title: string, updated: number): Session => ({
 });
 
 describe("describeCandidates", () => {
-  test("liste lisible avec id, titre et date", () => {
+  test("readable list with id, title and date", () => {
     const out = describeCandidates([session("a", "frontend build", 100)]);
     expect(out).toContain("a");
     expect(out).toContain("frontend build");
     expect(out).toContain("1970-01-01T00:00:00.100Z");
   });
-  test("vide → message dédié", () => {
-    expect(describeCandidates([])).toBe("Aucune session ne correspond.");
+  test("empty → dedicated message", () => {
+    expect(describeCandidates([])).toBe("No session matches.");
   });
 });
 
 describe("listRecentHint", () => {
-  test("top 5 avec titre et id", () => {
+  test("top 5 with title and id", () => {
     const sessions = Array.from({ length: 6 }, (_, i) => session(`s${i}`, `t${i}`, i));
     const out = listRecentHint(sessions);
     expect(out).toContain("s5");
@@ -815,54 +815,54 @@ describe("listRecentHint", () => {
 });
 ```
 
-- [ ] **Step 2: Exécuter pour voir échouer**
+- [ ] **Step 2: Run it to see it fail**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/send.test.ts`
-Expected: FAIL — exports manquants.
+Expected: FAIL — missing exports.
 
-- [ ] **Step 3: Implémenter `describeCandidates` + `listRecentHint`**
+- [ ] **Step 3: Implement `describeCandidates` + `listRecentHint`**
 
-Ajouter dans `src/index.ts` :
+Add in `src/index.ts`:
 
 ```ts
 export function describeCandidates(candidates: Session[]): string {
-  if (candidates.length === 0) return "Aucune session ne correspond.";
+  if (candidates.length === 0) return "No session matches.";
   return candidates
     .map(
       (s) =>
-        `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`,
+        `- [${s.id}] ${s.title} — updated ${fmtTime(s.time.updated)}`,
     )
     .join("\n");
 }
 
 export function listRecentHint(sessions: Session[]): string {
   return recentSessions(sessions, 5)
-    .map((s) => `- [${s.id}] ${s.title} — maj ${fmtTime(s.time.updated)}`)
+    .map((s) => `- [${s.id}] ${s.title} — updated ${fmtTime(s.time.updated)}`)
     .join("\n");
 }
 ```
 
-- [ ] **Step 4: Exécuter pour voir passer**
+- [ ] **Step 4: Run it to see it pass**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/send.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Enregistrer le tool `session_send`**
+- [ ] **Step 5: Register the `session_send` tool**
 
-Dans `src/index.ts`, ajouter `session_send` dans l'objet `tool` (après `session_search`) :
+In `src/index.ts`, add `session_send` to the `tool` object (after `session_search`):
 
 ```ts
       session_send: tool({
         description:
-          "Envoie un message direct (DM) à une autre session OpenCode du même serveur. " +
-          "Utilise-le quand l'utilisateur demande de parler à une autre session " +
-          "(ex. 'demande à la session frontend de...', 'tell weekly-digest ...'). " +
-          "Le message est injecté dans la session cible avec le préfixe @titre-source. " +
-          "N'envoie un DM que si l'utilisateur le demande ou si un autre agent t'a explicitement demandé de répondre. " +
-          "Ne réponds pas automatiquement à un DM reçu, sauf si le message contient une question ou une requête pour toi.",
+          "Sends a direct message (DM) to another OpenCode session on the same server. " +
+          "Use it when the user asks to talk to another session " +
+          "(e.g. 'ask the frontend session to...', 'tell weekly-digest ...'). " +
+          "The message is injected into the target session with the @source-title prefix. " +
+          "Only send a DM if the user asks for it or if another agent has explicitly asked you to reply. " +
+          "Do not automatically reply to a received DM unless the message contains a question or a request for you.",
         args: {
-          target: z.string().describe("Titre de la session cible (ou son id)"),
-          message: z.string().describe("Contenu du message à envoyer"),
+          target: z.string().describe("Title of the target session (or its id)"),
+          message: z.string().describe("Content of the message to send"),
         },
         async execute(args, ctx) {
           try {
@@ -871,24 +871,24 @@ Dans `src/index.ts`, ajouter `session_send` dans l'objet `tool` (après `session
             const resolved = resolveTarget(all, args.target, ctx.sessionID);
             if (resolved.kind === "self") {
               return {
-                title: "session_send refusé",
-                output: "Tu es déjà dans cette session. Choisis une autre session cible.",
+                title: "session_send refused",
+                output: "You are already in this session. Choose another target session.",
               };
             }
             if (resolved.kind === "not-found") {
               const hint = listRecentHint(all);
               return {
-                title: "Session introuvable",
+                title: "Session not found",
                 output:
-                  `Session "${args.target}" introuvable. Utilise session_search pour trouver la bonne session.\n` +
-                  `Sessions récentes du serveur :\n${hint}`,
+                  `Session "${args.target}" not found. Use session_search to find the right session.\n` +
+                  `Recent sessions on the server:\n${hint}`,
               };
             }
             if (resolved.kind === "ambiguous") {
               return {
-                title: "Session ambiguë",
+                title: "Ambiguous session",
                 output:
-                  `Plusieurs sessions correspondent à "${args.target}". Précise avec un id ou un titre plus exact :\n` +
+                  `Multiple sessions match "${args.target}". Narrow it down with a more exact id or title:\n` +
                   describeCandidates(resolved.candidates),
               };
             }
@@ -902,21 +902,21 @@ Dans `src/index.ts`, ajouter `session_send` dans l'objet `tool` (après `session
               throwOnError: true,
             });
             return {
-              title: "DM envoyé",
+              title: "DM sent",
               output:
-                `DM envoyé à "${targetSession.title}" (${targetSession.id}) à ${fmtTime(Date.now())}.`,
+                `DM sent to "${targetSession.title}" (${targetSession.id}) at ${fmtTime(Date.now())}.`,
             };
           } catch (err) {
             return {
-              title: "Erreur session_send",
-              output: `Impossible d'envoyer le DM : ${String(err)}`,
+              title: "session_send error",
+              output: `Could not send the DM: ${String(err)}`,
             };
           }
         },
       }),
 ```
 
-- [ ] **Step 6: Exécuter tous les tests**
+- [ ] **Step 6: Run all tests**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bun test test/`
 Expected: PASS (smoke + helpers + search + send).
@@ -930,74 +930,74 @@ Expected: exit 0.
 
 ```bash
 git add src/index.ts test/send.test.ts
-git commit -m "feat: tool session_send (fire-and-forget via promptAsync)"
+git commit -m "feat: session_send tool (fire-and-forget via promptAsync)"
 ```
 
 ---
 
-### Task 5: Vérification manuelle E2E (scénario réel)
+### Task 5: Manual E2E verification (real scenario)
 
 **Files:**
-- Aucun (test manuel dans OpenCode).
+- None (manual test in OpenCode).
 
 **Interfaces:**
-- Consumes: le plugin complet (Task 0-4) + `opencode.json` (Task 0).
+- Consumes: the complete plugin (Tasks 0-4) + `opencode.json` (Task 0).
 
-- [ ] **Step 1: Vérifier le chargement du plugin**
+- [ ] **Step 1: Verify plugin loading**
 
-Lancer `opencode` à la racine du repo (workdir `E:\programmes\apps\opencode-plugins`). Vérifier :
-- Aucune erreur de chargement du plugin dans les logs/session.
-- Si le loader refuse `"./src/index.ts"` : éditer `opencode.json` → `"plugin": ["./"]` (résolution via package.json `main`), relancer, vérifier le chargement. Committer le changement si nécessaire.
+Launch `opencode` at the repo root (workdir `E:\programmes\apps\opencode-plugins`). Verify:
+- No plugin loading errors in the logs/session.
+- If the loader rejects `"./src/index.ts"`: edit `opencode.json` → `"plugin": ["./"]` (resolution via package.json `main`), relaunch, verify loading. Commit the change if needed.
 
-- [ ] **Step 2: Vérifier que les outils sont visibles**
+- [ ] **Step 2: Verify the tools are visible**
 
-Dans la session, demander : *"quels outils as-tu disponibles ?"* ou vérifier via l'UI que `session_search` et `session_send` apparaissent dans la liste des outils.
+In the session, ask: *"which tools do you have available?"* or check via the UI that `session_search` and `session_send` appear in the tool list.
 
-- [ ] **Step 3: Préparer deux sessions nommées**
+- [ ] **Step 3: Prepare two named sessions**
 
-1. Session A (celle-ci) : `/title user-profiles`
-2. Nouvelle session B (autre onglet, même projet) : `/title weekly-digest`
-3. Donner à B un contenu parlant : *"je travaille sur un job hebdomadaire qui utilise users.name dans src/jobs/weeklyDigest.ts"*
+1. Session A (this one): `/title user-profiles`
+2. New session B (another tab, same project): `/title weekly-digest`
+3. Give B a meaningful content: *"I'm working on a weekly job that uses users.name in src/jobs/weeklyDigest.ts"*
 
-- [ ] **Step 4: Envoyer le DM depuis A**
+- [ ] **Step 4: Send the DM from A**
 
-Dans la session A, demander :
-*"demande à la session weekly-digest de mettre à jour son SQL : users.name → users.display_name"*
+In session A, ask:
+*"ask the weekly-digest session to update its SQL: users.name → users.display_name"*
 
-Vérifier :
-- L'agent A appelle `session_search` (ou directement `session_send` avec le titre).
-- La sortie du tool confirme "DM envoyé à ... (id)".
+Verify:
+- Agent A calls `session_search` (or directly `session_send` with the title).
+- The tool output confirms "DM sent to ... (id)".
 
-- [ ] **Step 5: Vérifier la réception dans B**
+- [ ] **Step 5: Verify reception in B**
 
-Dans la session B :
-- Un message utilisateur `@user-profiles | users.name → users.display_name` apparaît dans le transcript (préfixe @ visible).
-- L'agent B réagit et propose/effectue la modification de `src/jobs/weeklyDigest.ts`.
+In session B:
+- A user message `@user-profiles | users.name → users.display_name` appears in the transcript (@ prefix visible).
+- Agent B reacts and proposes/performs the modification of `src/jobs/weeklyDigest.ts`.
 
-- [ ] **Step 6: Vérifier les cas limites**
+- [ ] **Step 6: Verify the edge cases**
 
-1. **Ambigu** : créer une 3e session `/title user-profiles-2` (ou un titre contenant "user-profiles"), redemander un DM à "user-profiles" depuis A → le tool retourne la liste des candidats, l'agent demande de préciser.
-2. **Introuvable** : demander un DM à "session-inexistante" → le tool retourne "Session introuvable" + la liste des 5 sessions récentes.
-3. **Auto-envoi** : demander à l'agent de s'envoyer un DM à lui-même (son propre titre) → refus "Tu es déjà dans cette session".
-4. **Recherche par contenu** : dans A, demander *"trouve la dernière session qui parle de weeklyDigest"* → `session_search` retourne la session B avec un extrait du transcript.
+1. **Ambiguous**: create a 3rd session `/title user-profiles-2` (or a title containing "user-profiles"), ask again for a DM to "user-profiles" from A → the tool returns the candidate list, the agent asks to narrow it down.
+2. **Not found**: ask for a DM to "nonexistent-session" → the tool returns "Session not found" + the list of the 5 most recent sessions.
+3. **Self-send**: ask the agent to send a DM to itself (its own title) → refusal "You are already in this session".
+4. **Content search**: in A, ask *"find the latest session that talks about weeklyDigest"* → `session_search` returns session B with an excerpt of the transcript.
 
-- [ ] **Step 7: Typecheck final**
+- [ ] **Step 7: Final typecheck**
 
 Run (workdir `E:\programmes\apps\opencode-plugins`): `bunx tsc --noEmit`
 Expected: exit 0.
 
-- [ ] **Step 8: Commit final si fichiers modifiés**
+- [ ] **Step 8: Final commit if files were modified**
 
 ```bash
 git add -A
-git commit -m "docs: E2E vérifié (chargement, DM A→B, cas limites)"
+git commit -m "docs: E2E verified (loading, DM A→B, edge cases)"
 ```
-Sauter si rien n'a changé (aucune modification de fichier pendant le test manuel).
+Skip if nothing changed (no file modifications during the manual test).
 
 ---
 
-## Self-Review (à exécuter après écriture du plan)
+## Self-Review (run after writing the plan)
 
-1. **Spec coverage** : chaque section du spec (voir `docs/superpowers/specs/2026-08-13-inter-session-dm-design.md`) doit correspondre à une tâche.
-2. **Placeholder scan** : aucun "TBD"/"TODO"/"implement later" dans le plan.
-3. **Type consistency** : noms cohérents entre tâches (`resolveTarget`, `formatDM`, `cropExcerpt`, `collectText`, `recentSessions`, `searchByTitle`, `fmtTime`, `buildSearchResult`, `describeCandidates`, `listRecentHint`, `SearchHit`, `ResolveResult`).
+1. **Spec coverage**: every spec section (see `docs/superpowers/specs/2026-08-13-inter-session-dm-design.md`) must map to a task.
+2. **Placeholder scan**: no "TBD"/"TODO"/"implement later" in the plan.
+3. **Type consistency**: consistent names across tasks (`resolveTarget`, `formatDM`, `cropExcerpt`, `collectText`, `recentSessions`, `searchByTitle`, `fmtTime`, `buildSearchResult`, `describeCandidates`, `listRecentHint`, `SearchHit`, `ResolveResult`).

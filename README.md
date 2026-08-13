@@ -1,12 +1,12 @@
 # opencode-tell-sessions
 
-Messagerie directe (DM) inter-sessions pour OpenCode : les agents de sessions
-différentes du même serveur peuvent se parler en temps réel, sans intervention
-humaine.
+Inter-session direct messaging (DM) for OpenCode: agents in different sessions
+on the same server can talk to each other in real time, without human
+intervention.
 
 ## Installation
 
-Ajoutez le plugin à votre `opencode.json` :
+Add the plugin to your `opencode.json`:
 
 ```json
 {
@@ -14,27 +14,27 @@ Ajoutez le plugin à votre `opencode.json` :
 }
 ```
 
-## Utilisation
+## Usage
 
-Depuis n'importe quelle session, demandez à l'agent de parler à une autre
-session — par titre, date ou contenu de conversation :
+From any session, ask the agent to talk to another session, by title, date, or
+conversation content:
 
-- « demande à la session frontend de mettre à jour le endpoint »
-- « tell weekly-digest we renamed users.name to display_name »
-- « trouve la dernière session qui parle de weeklyDigest et envoie-lui ce message »
+- "ask the frontend session to update the endpoint"
+- "tell weekly-digest we renamed users.name to display_name"
+- "find the latest session that talks about weeklyDigest and send it this message"
 
-L'agent utilise `session_search` pour trouver la bonne session, puis
-`session_send` pour lui envoyer un message. Le message apparaît dans la
-session cible avec le préfixe `@titre-source`.
+The agent uses `session_search` to find the right session, then
+`session_send` to send it a message. The message appears in the
+target session with the `@source-title` prefix.
 
-## Développement
+## Development
 
 ```bash
 bun install
-bun test        # tests unitaires
+bun test        # unit tests
 bun run typecheck
 ```
 
-## Licence
+## License
 
 MIT
