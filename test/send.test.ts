@@ -2,16 +2,14 @@ import { describe, expect, test } from "bun:test";
 import {
   describeCandidates,
   listRecentHint,
-  type Session,
+  type SessionView,
 } from "../src/helpers";
 
-const session = (id: string, title: string, updated: number): Session => ({
+const session = (id: string, title: string, updated: number): SessionView => ({
   id,
-  projectID: "p1",
   directory: "/proj",
   title,
-  version: "1",
-  time: { created: 0, updated },
+  updated,
 });
 
 describe("describeCandidates", () => {

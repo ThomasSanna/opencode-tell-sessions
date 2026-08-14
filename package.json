@@ -1,7 +1,7 @@
 {
   "name": "opencode-tell-sessions",
-  "version": "0.2.0",
-  "description": "Inter-session direct messaging (DM) for OpenCode: agents in different sessions can message each other",
+  "version": "0.3.0",
+  "description": "Inter-session direct messaging (DM) for OpenCode V1 & V2: agents in different sessions can message each other",
   "type": "module",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -41,14 +41,13 @@
   },
   "homepage": "https://github.com/ThomasSanna/opencode-tell-sessions#readme",
   "dependencies": {
+    "@opencode-ai/client": "^0.0.0-next-17430",
+    "@opencode-ai/plugin": "^0.0.0-next-17430",
     "@opencode-ai/sdk": "1.18.16",
+    "effect": "4.0.0-beta.101",
     "zod": "4.1.8"
   },
-  "peerDependencies": {
-    "@opencode-ai/plugin": ">=1.0.0"
-  },
   "devDependencies": {
-    "@opencode-ai/plugin": "1.18.16",
     "typescript": "^5.8.2"
   }
 }

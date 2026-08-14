@@ -9,16 +9,14 @@ import {
   resolveTarget,
   searchByTitle,
   fmtTime,
-  type Session,
+  type SessionView,
 } from "../src/helpers";
 
-const session = (id: string, title: string, updated: number): Session => ({
+const session = (id: string, title: string, updated: number): SessionView => ({
   id,
-  projectID: "p1",
   directory: "/proj",
   title,
-  version: "1",
-  time: { created: 0, updated },
+  updated,
 });
 
 describe("resolveTarget", () => {
@@ -115,30 +113,16 @@ describe("countInboundDMs", () => {
   const dm = (id: string) =>
     `Direct message from session "X" (id: ${id}). Reply to the sender using the session_send tool with target "${id}".`;
 
-  test("counts text parts carrying the sender marker", () => {
-    const messages = [
-      { parts: [{ type: "text", text: dm("ses_a") }] },
-      { parts: [{ type: "text", text: dm("ses_b") }] },
-      { parts: [{ type: "text", text: "plain user message" }] },
-    ];
-    expect(countInboundDMs(messages, "ses_a")).toBe(1);
-    expect(countInboundDMs(messages, "ses_b")).toBe(1);
-    expect(countInboundDMs(messages, "ses_c")).toBe(0);
+  test("counts texts carrying the sender marker", () => {
+    const texts = [dm("ses_a"), dm("ses_b"), "plain user message"];
+    expect(countInboundDMs(texts, "ses_a")).toBe(1);
+    expect(countInboundDMs(texts, "ses_b")).toBe(1);
+    expect(countInboundDMs(texts, "ses_c")).toBe(0);
   });
 
-  test("ignores synthetic and non-text parts", () => {
-    const messages = [
-      { parts: [{ type: "text", text: dm("ses_a"), synthetic: true }] },
-      { parts: [{ type: "tool", text: dm("ses_a") }] },
-      { parts: [{ type: "text" }] },
-    ];
-    expect(countInboundDMs(messages, "ses_a")).toBe(0);
-  });
-
-  test("empty or missing parts → 0", () => {
+  test("empty or missing entries → 0", () => {
     expect(countInboundDMs([], "ses_a")).toBe(0);
-    expect(countInboundDMs([{ parts: undefined }], "ses_a")).toBe(0);
-    expect(countInboundDMs([{}], "ses_a")).toBe(0);
+    expect(countInboundDMs(["", "plain"], "ses_a")).toBe(0);
   });
 
   test("DM_EXCHANGE_LIMIT is a positive cap", () => {

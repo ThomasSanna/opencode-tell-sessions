@@ -1,29 +1,37 @@
-import type { Session } from "@opencode-ai/sdk";
+import type { SearchHit, SessionView } from "./model.js";
 
-// Re-exported so tests can type their fixtures:
-export type { Session };
+/**
+ * Pure, version-agnostic helpers. They operate exclusively on the normalized
+ * {@link SessionView} type so they can be shared between the V1 and V2
+ * runtime adapters without importing any OpenCode SDK.
+ */
 
 export type ResolveResult =
-  | { kind: "ok"; session: Session }
-  | { kind: "ambiguous"; candidates: Session[] }
+  | { kind: "ok"; session: SessionView }
+  | { kind: "ambiguous"; candidates: SessionView[] }
   | { kind: "self" }
   | { kind: "not-found" };
 
+/**
+ * Resolve a free-form target (exact title, id, or unique case-insensitive
+ * substring) against a list of sessions. Excludes the sender when it would
+ * make a match set unambiguous.
+ */
 export function resolveTarget(
-  sessions: Session[],
+  sessions: SessionView[],
   target: string,
   senderID?: string,
 ): ResolveResult {
   const t = target.trim();
   if (t === "") return { kind: "not-found" };
-  const self = (s: Session): ResolveResult =>
+  const self = (s: SessionView): ResolveResult =>
     senderID && s.id === senderID ? { kind: "self" } : { kind: "ok", session: s };
   const exact = sessions.find((s) => s.title === t);
   if (exact) return self(exact);
   const direct = sessions.find((s) => s.id === t);
   if (direct) return self(direct);
   const lower = t.toLowerCase();
-  const matches = sessions.filter((s) => s.title.toLowerCase().includes(lower));
+  const matches = sessions.filter((s) => s.title?.toLowerCase().includes(lower));
   if (matches.length === 1) return self(matches[0]);
   if (matches.length > 1) {
     const candidates = senderID
@@ -36,31 +44,20 @@ export function resolveTarget(
   return { kind: "not-found" };
 }
 
+/** Maximum number of DMs two sessions may exchange before the loop guard. */
 export const DM_EXCHANGE_LIMIT = 10;
 
-export type MessageLike = {
-  parts?: readonly { type?: string; text?: string; synthetic?: boolean }[];
-};
-
 /**
- * Counts direct messages sent by `senderID` that are present in a session's
- * message history. Each injected DM carries the marker `(id: <senderID>)` in
- * its instruction block, which makes the count unambiguous across sessions.
+ * Counts direct messages sent by `senderID` across a list of per-message
+ * plain-text strings. Each injected DM carries the marker `(id: <senderID>)`
+ * in its instruction block, which makes the count unambiguous across sessions.
  */
 export function countInboundDMs(
-  messages: readonly MessageLike[],
+  texts: readonly string[],
   senderID: string,
 ): number {
   const marker = `(id: ${senderID})`;
-  return messages.filter((m) =>
-    (m.parts ?? []).some(
-      (p) =>
-        p.type === "text" &&
-        !p.synthetic &&
-        typeof p.text === "string" &&
-        p.text.includes(marker),
-    ),
-  ).length;
+  return texts.filter((t) => t.includes(marker)).length;
 }
 
 export function formatDM(
@@ -109,6 +106,7 @@ export function cropExcerpt(
   return `…${text.slice(start, end)}…`;
 }
 
+/** Concatenates non-synthetic text parts from a V1-style message. */
 export function collectText(
   parts: readonly { type?: string; text?: string; synthetic?: boolean }[],
 ): string {
@@ -119,40 +117,34 @@ export function collectText(
 }
 
 export function recentSessions(
-  sessions: Session[],
+  sessions: SessionView[],
   limit: number,
   excludeID?: string,
-): Session[] {
+): SessionView[] {
   return [...sessions]
     .filter((s) => s.id !== excludeID)
-    .sort((a, b) => b.time.updated - a.time.updated)
+    .sort((a, b) => b.updated - a.updated)
     .slice(0, limit);
 }
 
-export function searchByTitle(sessions: Session[], query: string): Session[] {
+export function searchByTitle(
+  sessions: SessionView[],
+  query: string,
+): SessionView[] {
   const q = query.toLowerCase();
-  return sessions.filter((s) => s.title.toLowerCase().includes(q));
+  return sessions.filter((s) => s.title?.toLowerCase().includes(q));
 }
 
 export function fmtTime(ts: number): string {
   return new Date(ts).toISOString();
 }
 
-export type SearchHit = {
-  sessionID: string;
-  title: string;
-  created: number;
-  updated: number;
-  directory?: string;
-  excerpt?: string;
-};
-
-export function toHit(s: Session, excerpt?: string): SearchHit {
+export function toHit(s: SessionView, excerpt?: string): SearchHit {
   return {
     sessionID: s.id,
     title: s.title,
-    created: s.time.created,
-    updated: s.time.updated,
+    created: s.created,
+    updated: s.updated,
     directory: s.directory,
     excerpt,
   };
@@ -164,7 +156,8 @@ export function buildSearchResult(hits: SearchHit[]): string {
     .map((h) => {
       const dir = h.directory ? ` (${h.directory})` : "";
       const ex = h.excerpt ? `\n    excerpt: ${h.excerpt}` : "";
-      return `- [${h.sessionID}] ${h.title} — updated ${fmtTime(h.updated)}${dir}${ex}`;
+      const title = h.title ?? "untitled";
+      return `- [${h.sessionID}] ${title} — updated ${fmtTime(h.updated)}${dir}${ex}`;
     })
     .join("\n");
   const cap = 6000;
@@ -172,16 +165,20 @@ export function buildSearchResult(hits: SearchHit[]): string {
   return out.length <= cap ? out : `${out.slice(0, cap - suffix.length)}${suffix}`;
 }
 
-function formatSessionLine(s: Session): string {
-  return `- [${s.id}] ${s.title} — updated ${fmtTime(s.time.updated)}`;
+function formatSessionLine(s: SessionView): string {
+  const title = s.title ?? s.id;
+  return `- [${s.id}] ${title} — updated ${fmtTime(s.updated)}`;
 }
 
-export function describeCandidates(candidates: Session[]): string {
+export function describeCandidates(candidates: SessionView[]): string {
   if (candidates.length === 0) return "No session matches.";
   return candidates.map(formatSessionLine).join("\n");
 }
 
-export function listRecentHint(sessions: Session[], excludeID?: string): string {
+export function listRecentHint(
+  sessions: SessionView[],
+  excludeID?: string,
+): string {
   return recentSessions(sessions, 5, excludeID)
     .map(formatSessionLine)
     .join("\n");
