@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/ThomasSanna/opencode-tell-sessions/compare/v0.2.0...v0.3.0) (2026-08-14)
+
+
+### Features
+
+* dual-compat plugin for OpenCode V1 and V2 ([00ab9e1](https://github.com/ThomasSanna/opencode-tell-sessions/commit/00ab9e176d14829a3526323d3c78a608aad1414d))
+
 ## [0.2.0](https://github.com/ThomasSanna/opencode-tell-sessions/compare/v0.1.1...v0.2.0) (2026-08-13)
 
 
