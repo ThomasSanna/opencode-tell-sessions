@@ -16,6 +16,16 @@ import {
 import type { SessionView } from "./model.js";
 import type { SessionRuntime } from "./runtime.js";
 
+/** Default and cap for `session_search` results; the cap mirrors the V1 schema's `.max(20)`. */
+const SEARCH_LIMIT_DEFAULT = 10;
+const SEARCH_LIMIT_MAX = 20;
+
+/** Normalize the user-supplied limit so V1 and V2 adapters behave identically. */
+function normalizeLimit(limit: number | undefined): number {
+  if (limit === undefined || Number.isNaN(limit)) return SEARCH_LIMIT_DEFAULT;
+  return Math.min(Math.max(Math.floor(limit), 1), SEARCH_LIMIT_MAX);
+}
+
 export interface SearchArgs {
   query: string;
   limit?: number;
@@ -36,7 +46,7 @@ export async function runSearch(
   args: SearchArgs,
   senderID: string,
 ): Promise<string> {
-  const limit = args.limit ?? 10;
+  const limit = normalizeLimit(args.limit);
   const sessions = await runtime.listSessions();
   const hits = searchByTitle(sessions, args.query).map((s) => toHit(s));
   const seen = new Set(hits.map((h) => h.sessionID));

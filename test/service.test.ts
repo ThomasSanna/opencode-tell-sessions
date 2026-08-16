@@ -108,3 +108,38 @@ describe("runSend", () => {
     expect(runtime.sent).toHaveLength(0);
   });
 });
+
+describe("runSearch limit", () => {
+  test("clamps an oversized limit to the tool cap", async () => {
+    const sessions = Array.from({ length: 25 }, (_, i) => session(`s${i}`, `t${i}`, i));
+    let calls = 0;
+    const runtime = makeRuntime({
+      listSessions: () => Promise.resolve(sessions),
+      messageTexts: () => {
+        calls += 1;
+        return Promise.resolve([]);
+      },
+    });
+    const out = await runSearch(runtime, { query: "zzz", limit: 999 }, "self");
+    expect(calls).toBe(20);
+    expect(out.split("\n")).toHaveLength(20);
+    expect(out).toContain("[s24] t24");
+    expect(out).not.toContain("[s4] t4");
+  });
+
+  test("clamps a non-positive limit to 1", async () => {
+    const sessions = Array.from({ length: 5 }, (_, i) => session(`s${i}`, `t${i}`, i));
+    let calls = 0;
+    const runtime = makeRuntime({
+      listSessions: () => Promise.resolve(sessions),
+      messageTexts: () => {
+        calls += 1;
+        return Promise.resolve([]);
+      },
+    });
+    const out = await runSearch(runtime, { query: "zzz", limit: -5 }, "self");
+    expect(calls).toBe(1);
+    expect(out.split("\n")).toHaveLength(1);
+    expect(out).toContain("[s4] t4");
+  });
+});
