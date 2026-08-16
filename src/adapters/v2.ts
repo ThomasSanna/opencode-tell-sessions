@@ -2,6 +2,11 @@ import { Plugin } from "@opencode-ai/plugin";
 import { Schema } from "effect";
 import { createV2Runtime } from "../runtime/v2.js";
 import { runSearch, runSend } from "../service.js";
+import {
+  errMsg,
+  SEND_TOOL_DESCRIPTION,
+  SEARCH_TOOL_DESCRIPTION,
+} from "../text.js";
 
 /**
  * OpenCode V2 plugin adapter.
@@ -18,11 +23,7 @@ export const v2plugin = Plugin.define({
     await ctx.tool.transform((tools) => {
       tools.add({
         name: "session_search",
-        description:
-          "Search OpenCode sessions by title, date, or conversation content. " +
-          "Use this when the user mentions another session ambiguously " +
-          "(e.g. 'the last session that talks about frontend', 'the backend session'). " +
-          "Returns candidate sessions sorted by recency with their title, id, last-updated date, and an excerpt.",
+        description: SEARCH_TOOL_DESCRIPTION,
         input: Schema.Struct({
           query: Schema.String,
           limit: Schema.optional(Schema.Number),
@@ -32,25 +33,14 @@ export const v2plugin = Plugin.define({
             const content = await runSearch(runtime, input, context.sessionID);
             return { content };
           } catch (err) {
-            return { content: `Failed to list sessions: ${String(err)}` };
+            return { content: `Failed to list sessions: ${errMsg(err)}` };
           }
         },
       });
 
       tools.add({
         name: "session_send",
-        description:
-          "Send a direct message (DM) to another OpenCode session on the same server. " +
-          "Use this when the user asks to talk to another session " +
-          "(e.g. 'ask the frontend session to update the endpoint', 'tell weekly-digest ...'). " +
-          "The message is injected into the target session with the @source-title prefix plus " +
-          "instructions telling it to answer via session_send when needed and to stop " +
-          "once the exchange has served its purpose, " +
-          "so the conversation can flow both ways without looping. " +
-          "A loop guard refuses to send once two sessions have exchanged " +
-          "10 DMs. " +
-          "Only send a DM if the user asks for it or if another agent explicitly asked you to reply. " +
-          "Do not automatically reply to a received DM, unless the message contains a question or a request for you.",
+        description: SEND_TOOL_DESCRIPTION,
         input: Schema.Struct({
           target: Schema.String,
           message: Schema.String,
@@ -60,7 +50,7 @@ export const v2plugin = Plugin.define({
             const content = await runSend(runtime, input, context.sessionID);
             return { content };
           } catch (err) {
-            return { content: `Failed to send DM: ${String(err)}` };
+            return { content: `Failed to send DM: ${errMsg(err)}` };
           }
         },
       });

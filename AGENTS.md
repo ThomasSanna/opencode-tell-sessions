@@ -22,6 +22,7 @@ so each loader picks up the export it understands from the same module.
 | `src/service.ts` | Version-agnostic `runSearch` / `runSend` implementations over `SessionRuntime`. |
 | `src/model.ts` | `SessionView` / `SearchHit` — the normalized, runtime-agnostic session model. |
 | `src/helpers.ts` | Pure, unit-tested helpers operating on `SessionView` (`resolveTarget`, `formatDM`, `cropExcerpt`, `buildSearchResult`, ...). |
+| `src/text.ts` | Shared, user-facing tool text (tool descriptions, error rendering) used by both adapters to prevent drift. |
 | `test/` | Bun unit tests: `smoke`, `helpers`, `search`, `send`, `service`. |
 | `.opencode/skills/` | Skills shipped with the project. |
 | `.opencode/command/` | Slash commands shipped with the project. |
