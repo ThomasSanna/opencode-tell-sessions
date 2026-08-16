@@ -17,7 +17,7 @@ OpenCode용 세션 간 직접 메시지(DM): 같은 서버의 서로 다른 세�
 
 ```json
 {
-  "plugin": ["opencode-tell-sessions"]
+  "plugin": ["opencode-tell-sessions@latest"]
 }
 ```
 

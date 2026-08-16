@@ -17,7 +17,7 @@ OpenCode のセッション間ダイレクトメッセージ（DM）: 同じサ�
 
 ```json
 {
-  "plugin": ["opencode-tell-sessions"]
+  "plugin": ["opencode-tell-sessions@latest"]
 }
 ```
 

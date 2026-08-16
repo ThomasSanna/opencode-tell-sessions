@@ -17,7 +17,7 @@ OpenCode 的会话间直接消息（DM）: 同一服务器上不同会话中的�
 
 ```json
 {
-  "plugin": ["opencode-tell-sessions"]
+  "plugin": ["opencode-tell-sessions@latest"]
 }
 ```
 

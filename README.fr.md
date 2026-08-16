@@ -18,7 +18,7 @@ Ajoutez le plugin à votre `opencode.json` :
 
 ```json
 {
-  "plugin": ["opencode-tell-sessions"]
+  "plugin": ["opencode-tell-sessions@latest"]
 }
 ```
 
