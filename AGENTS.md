@@ -5,20 +5,20 @@ different sessions on the same server message each other in real time.
 It exposes two tools: `session_search` (find a session by title, date, or
 content) and `session_send` (fire-and-forget DM into a target session).
 
-The plugin is **dual-compatible** (OpenCode V1 and V2). `src/index.ts`
-exports both a V1 `plugin` function and a V2 default export (`Plugin.define`),
-so each loader picks up the export it understands from the same module.
+The plugin targets **OpenCode 1.x (V1)**. `src/index.ts` exports the V1
+`plugin` function (named and default), registered via the legacy `tool()`
+helper from `@opencode-ai/plugin`. The V2 adapter was removed because the
+1.18.x plugin API has no tool registration; a future 2.0-beta port would
+need to target the `0.0.0-next-*` line (`/v1` subpath + `ctx.tool.transform`).
 
 ## Layout
 
 | Path | Purpose |
 |---|---|
-| `src/index.ts` | Dual-compat entry. Exports ONLY `plugin` (V1 adapter fn) and the default V2 `Plugin.define` — V1 iterates exported functions, V2 reads the default export. No other export allowed here. |
-| `src/adapters/v1.ts` | V1 adapter: registers both tools with the legacy `tool()` helper from `@opencode-ai/plugin/v1` (zod args, `{ title, output }` results). |
-| `src/adapters/v2.ts` | V2 adapter: `Plugin.define` registers both tools via `ctx.tool.transform(tools.add(...))` with Effect `Schema` inputs and `{ content }` results. |
+| `src/index.ts` | V1 entry. Exports ONLY `plugin` (named) and the same `plugin` as default. No other export allowed here. |
+| `src/adapters/v1.ts` | V1 adapter: registers both tools with the legacy `tool()` helper from `@opencode-ai/plugin` (zod args, `{ title, output }` results), returned as an object keyed by tool name. |
 | `src/runtime.ts` | `SessionRuntime` interface (`listSessions`, `messageTexts`, `send`) that decouples tool logic from the SDK. |
 | `src/runtime/v1.ts` | V1 runtime adapter over the legacy `@opencode-ai/sdk` client. |
-| `src/runtime/v2.ts` | V2 runtime adapter: `send` via `ctx.session.prompt`; list/messages via a lazily-created full client (`@opencode-ai/client/service`). |
 | `src/service.ts` | Version-agnostic `runSearch` / `runSend` implementations over `SessionRuntime`. |
 | `src/model.ts` | `SessionView` / `SearchHit` — the normalized, runtime-agnostic session model. |
 | `src/helpers.ts` | Pure, unit-tested helpers operating on `SessionView` (`resolveTarget`, `formatDM`, `cropExcerpt`, `buildSearchResult`, ...). |
