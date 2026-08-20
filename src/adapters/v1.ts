@@ -1,4 +1,4 @@
-import { tool } from "@opencode-ai/plugin/v1";
+import { tool } from "@opencode-ai/plugin";
 import { z } from "zod";
 import { createV1Runtime, type V1Client } from "../runtime/v1.js";
 import { runSearch, runSend } from "../service.js";
@@ -16,13 +16,13 @@ import {
  * legacy `tool()` helper (zod args, `{ title, output }` results).
  */
 export const plugin = async (input: { client: V1Client }): Promise<{
-  tool: ReturnType<typeof tool>[];
+  tool: Record<string, ReturnType<typeof tool>>;
 }> => {
   const runtime = createV1Runtime(input.client);
 
   return {
-    tool: [
-      tool({
+    tool: {
+      session_search: tool({
         description: SEARCH_TOOL_DESCRIPTION,
         args: {
           query: z
@@ -48,7 +48,7 @@ export const plugin = async (input: { client: V1Client }): Promise<{
           }
         },
       }),
-      tool({
+      session_send: tool({
         description: SEND_TOOL_DESCRIPTION,
         args: {
           target: z.string().describe("Title of the target session (or its id)"),
@@ -66,6 +66,6 @@ export const plugin = async (input: { client: V1Client }): Promise<{
           }
         },
       }),
-    ],
+    },
   };
 };

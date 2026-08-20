@@ -41,8 +41,8 @@
   },
   "homepage": "https://github.com/ThomasSanna/opencode-tell-sessions#readme",
   "dependencies": {
-    "@opencode-ai/client": "^0.0.0-next-17430",
-    "@opencode-ai/plugin": "^0.0.0-next-17430",
+    "@opencode-ai/client": "0.0.0-next-17444",
+    "@opencode-ai/plugin": "1.18.18",
     "@opencode-ai/sdk": "1.18.16",
     "effect": "4.0.0-beta.101",
     "zod": "4.1.8"
