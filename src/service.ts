@@ -26,14 +26,35 @@ function normalizeLimit(limit: number | undefined): number {
   return Math.min(Math.max(Math.floor(limit), 1), SEARCH_LIMIT_MAX);
 }
 
+/** Visibility scope for session lookup. Defaults to `"project"` (same directory as the sender); pass `"server"` to opt into cross-project access. */
+export type Scope = "project" | "server";
+
+/**
+ * Restrict a session list to the sender's project directory unless the caller
+ * explicitly opts into server-wide visibility. Falls back to the full list
+ * when the sender is unknown or has no directory so older runtimes keep working.
+ */
+function scopeSessions(
+  sessions: SessionView[],
+  senderID: string,
+  scope: Scope | undefined,
+): SessionView[] {
+  if (scope === "server") return sessions;
+  const sender = sessions.find((s) => s.id === senderID);
+  if (!sender?.directory) return sessions;
+  return sessions.filter((s) => s.directory === sender.directory);
+}
+
 export interface SearchArgs {
   query: string;
   limit?: number;
+  scope?: Scope;
 }
 
 export interface SendArgs {
   target: string;
   message: string;
+  scope?: Scope;
 }
 
 /**
@@ -48,9 +69,10 @@ export async function runSearch(
 ): Promise<string> {
   const limit = normalizeLimit(args.limit);
   const sessions = await runtime.listSessions();
-  const hits = searchByTitle(sessions, args.query).map((s) => toHit(s));
+  const visible = scopeSessions(sessions, senderID, args.scope);
+  const hits = searchByTitle(visible, args.query).map((s) => toHit(s));
   const seen = new Set(hits.map((h) => h.sessionID));
-  const batch = recentSessions(sessions, limit, senderID).filter(
+  const batch = recentSessions(visible, limit, senderID).filter(
     (s) => !seen.has(s.id),
   );
 
@@ -82,15 +104,16 @@ export async function runSend(
   senderID: string,
 ): Promise<string> {
   const sessions = await runtime.listSessions();
-  const resolved = resolveTarget(sessions, args.target, senderID);
+  const visible = scopeSessions(sessions, senderID, args.scope);
+  const resolved = resolveTarget(visible, args.target, senderID);
   if (resolved.kind === "self") {
     return "You are already in this session. Pick another target session.";
   }
   if (resolved.kind === "not-found") {
-    const hint = listRecentHint(sessions, senderID);
+    const hint = listRecentHint(visible, senderID);
     return (
       `Session "${args.target}" not found. Use session_search to find the right session.\n` +
-      `Recent sessions on the server:\n${hint}`
+      `Recent sessions:\n${hint}`
     );
   }
   if (resolved.kind === "ambiguous") {
@@ -101,9 +124,9 @@ export async function runSend(
   }
 
   const target = resolved.session;
-  const sender = sessions.find((s) => s.id === senderID)?.title ?? senderID;
+  const sender = visible.find((s) => s.id === senderID)?.title ?? senderID;
 
-  let prior = 0;
+  let prior: number;
   try {
     const [targetTexts, ownTexts] = await Promise.all([
       runtime.messageTexts(target.id),
@@ -113,7 +136,11 @@ export async function runSend(
       countInboundDMs(targetTexts, senderID) +
       countInboundDMs(ownTexts, target.id);
   } catch {
-    // Fail-open: if history can't be read, proceed without the loop guard.
+    // Fail-closed: without history the loop guard cannot run, so refuse rather than risk a loop.
+    return (
+      `Could not verify DM history with "${target.title ?? target.id}" — ` +
+      `DM not sent to avoid loops. Retry later or ask the user to confirm.`
+    );
   }
 
   if (prior >= DM_EXCHANGE_LIMIT) {

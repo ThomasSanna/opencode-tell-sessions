@@ -55,7 +55,7 @@ plugin to your `opencode.json`:
 
 ```json
 {
-  "plugin": ["./src/index.ts"]
+  "plugins": ["./src/index.ts"]
 }
 ```
 

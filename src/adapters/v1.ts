@@ -35,6 +35,10 @@ export const plugin = async (input: { client: V1Client }): Promise<{
             .max(20)
             .optional()
             .describe("Maximum number of sessions (default 10)"),
+          scope: z
+            .enum(["project", "server"])
+            .optional()
+            .describe("Visibility: same project directory (default) or whole server"),
         },
         async execute(args, ctx) {
           try {
@@ -53,6 +57,10 @@ export const plugin = async (input: { client: V1Client }): Promise<{
         args: {
           target: z.string().describe("Title of the target session (or its id)"),
           message: z.string().describe("Content of the message to send"),
+          scope: z
+            .enum(["project", "server"])
+            .optional()
+            .describe("Visibility: same project directory (default) or whole server"),
         },
         async execute(args, ctx) {
           try {

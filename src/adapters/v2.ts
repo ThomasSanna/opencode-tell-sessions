@@ -27,6 +27,7 @@ export const v2plugin = Plugin.define({
         input: Schema.Struct({
           query: Schema.String,
           limit: Schema.optional(Schema.Number),
+          scope: Schema.optional(Schema.Literals(["project", "server"])),
         }),
         async execute(input, context) {
           try {
@@ -44,6 +45,7 @@ export const v2plugin = Plugin.define({
         input: Schema.Struct({
           target: Schema.String,
           message: Schema.String,
+          scope: Schema.optional(Schema.Literals(["project", "server"])),
         }),
         async execute(input, context) {
           try {
