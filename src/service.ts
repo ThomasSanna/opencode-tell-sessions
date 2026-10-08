@@ -26,13 +26,18 @@ function normalizeLimit(limit: number | undefined): number {
   return Math.min(Math.max(Math.floor(limit), 1), SEARCH_LIMIT_MAX);
 }
 
-/** Visibility scope for session lookup. Defaults to `"project"` (same directory as the sender); pass `"server"` to opt into cross-project access. */
+/** Visibility scope for session lookup. `undefined` defaults to `"project"` (same directory as the sender); pass `"server"` to opt into cross-project access. */
 export type Scope = "project" | "server";
 
 /**
  * Restrict a session list to the sender's project directory unless the caller
- * explicitly opts into server-wide visibility. Falls back to the full list
- * when the sender is unknown or has no directory so older runtimes keep working.
+ * explicitly opts into server-wide visibility (`scope === "server"`).
+ * An absent `scope` (`undefined`) behaves like `"project"`.
+ * Falls back to the full list when the sender is unknown or has no directory,
+ * preserving backward compatibility with older runtimes.
+ * Assumes directory format parity across adapters: V1 maps `s.directory`
+ * (runtime/v1.ts) and V2 maps `s.location?.directory` (runtime/v2.ts) into
+ * the same normalized `SessionView.directory` before comparison here.
  */
 function scopeSessions(
   sessions: SessionView[],
