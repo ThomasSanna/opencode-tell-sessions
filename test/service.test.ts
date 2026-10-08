@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { formatDM } from "../src/helpers";
 import type { SessionView } from "../src/model";
 import type { SessionRuntime } from "../src/runtime";
 import { runSearch, runSend } from "../src/service";
@@ -96,9 +97,7 @@ describe("runSend", () => {
         Promise.resolve([session("self", "sender", 0), session("b", "receiver", 1)]),
       messageTexts: (id) =>
         Promise.resolve([
-          id === "b"
-            ? 'Direct message from session "sender" (id: self). Reply using the session_send tool with target "self".'
-            : 'Direct message from session "receiver" (id: b). Reply using the session_send tool with target "b".',
+          id === "b" ? formatDM("sender", "hello", "self") : formatDM("receiver", "hello", "b"),
         ].concat(
           Array.from({ length: 9 }, () => "repeated marker line (id: self)"),
         )),
@@ -141,5 +140,152 @@ describe("runSearch limit", () => {
     expect(calls).toBe(1);
     expect(out.split("\n")).toHaveLength(1);
     expect(out).toContain("[s4] t4");
+  });
+});
+
+describe("directory scoping", () => {
+  const proj = (id: string, title: string, updated: number): SessionView => ({
+    id,
+    directory: "/proj",
+    title,
+    updated,
+  });
+  const other = (id: string, title: string, updated: number): SessionView => ({
+    id,
+    directory: "/other",
+    title,
+    updated,
+  });
+
+  test("runSearch defaults to the sender project", async () => {
+    const runtime = makeRuntime({
+      listSessions: () =>
+        Promise.resolve([proj("self", "sender", 0), proj("b", "backend api", 200), other("x", "backend ops", 300)]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSearch(runtime, { query: "backend" }, "self");
+    expect(out).toContain("backend api");
+    expect(out).not.toContain("backend ops");
+    expect(out).not.toContain("[x]");
+  });
+
+  test("runSearch scope server includes other directories", async () => {
+    const runtime = makeRuntime({
+      listSessions: () => Promise.resolve([proj("self", "sender", 0), other("x", "backend ops", 300)]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSearch(runtime, { query: "backend", scope: "server" }, "self");
+    expect(out).toContain("backend ops");
+  });
+
+  test("runSend refuses a cross-directory target by default", async () => {
+    const runtime = makeRuntime({
+      listSessions: () => Promise.resolve([proj("self", "sender", 0), other("x", "other inbox", 1)]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSend(runtime, { target: "other inbox", message: "hi" }, "self");
+    expect(out).toContain("not found");
+    expect(runtime.sent).toHaveLength(0);
+  });
+
+  test("runSend scope server allows a cross-directory target", async () => {
+    const runtime = makeRuntime({
+      listSessions: () => Promise.resolve([proj("self", "sender", 0), other("x", "other inbox", 1)]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSend(runtime, { target: "other inbox", message: "hi", scope: "server" }, "self");
+    expect(out).toContain("DM sent");
+    expect(runtime.sent).toHaveLength(1);
+  });
+
+  test("runSearch falls back to full list when sender is unknown", async () => {
+    const runtime = makeRuntime({
+      listSessions: () =>
+        Promise.resolve([proj("a", "backend api", 200), other("x", "backend ops", 300)]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSearch(runtime, { query: "backend" }, "ghost");
+    expect(out).toContain("backend api");
+    expect(out).toContain("backend ops");
+  });
+
+  test("runSearch falls back to full list when sender has no directory", async () => {
+    const runtime = makeRuntime({
+      listSessions: () =>
+        Promise.resolve([
+          { id: "self", title: "sender", updated: 0 },
+          proj("a", "backend api", 200),
+          other("x", "backend ops", 300),
+        ]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSearch(runtime, { query: "backend" }, "self");
+    expect(out).toContain("backend api");
+    expect(out).toContain("backend ops");
+  });
+});
+
+describe("not-found scoping does not leak cross-project titles", () => {
+  const proj = (id: string, title: string, updated: number): SessionView => ({
+    id,
+    directory: "/proj",
+    title,
+    updated,
+  });
+  const other = (id: string, title: string, updated: number): SessionView => ({
+    id,
+    directory: "/other",
+    title,
+    updated,
+  });
+
+  test("runSend not-found hint omits other-directory sessions", async () => {
+    const runtime = makeRuntime({
+      listSessions: () =>
+        Promise.resolve([
+          proj("self", "sender", 0),
+          proj("b", "teammate inbox", 1),
+          other("x", "other secret inbox", 10),
+        ]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSend(runtime, { target: "missing-target", message: "hi" }, "self");
+    expect(out).toContain("not found");
+    expect(out).toContain("teammate inbox");
+    expect(out).not.toContain("other secret inbox");
+    expect(out).not.toContain("[x]");
+  });
+
+  test("runSearch recent batch omits other-directory sessions", async () => {
+    const runtime = makeRuntime({
+      listSessions: () =>
+        Promise.resolve([
+          proj("self", "sender", 0),
+          proj("b", "teammate inbox", 1),
+          other("x", "other secret inbox", 10),
+        ]),
+      messageTexts: () => Promise.resolve([]),
+    });
+    const out = await runSearch(runtime, { query: "zzz-no-match" }, "self");
+    expect(out).toContain("teammate inbox");
+    expect(out).not.toContain("other secret inbox");
+    expect(out).not.toContain("[x]");
+  });
+});
+
+describe("loop guard fail-closed", () => {
+  test("runSend refuses when DM history cannot be read", async () => {
+    const runtime = makeRuntime({
+      listSessions: () =>
+        Promise.resolve([
+          { id: "self", directory: "/proj", title: "sender", updated: 0 },
+          { id: "b", directory: "/proj", title: "receiver", updated: 1 },
+        ]),
+      messageTexts: () => Promise.reject(new Error("history unavailable")),
+    });
+    const out = await runSend(runtime, { target: "receiver", message: "hi" }, "self");
+    expect(out).toContain("Could not verify DM history");
+    expect(out).not.toContain("DM sent");
+    expect(runtime.sent).toHaveLength(0);
   });
 });

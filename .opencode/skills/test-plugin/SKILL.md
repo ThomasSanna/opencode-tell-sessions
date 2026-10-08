@@ -53,7 +53,7 @@ exported from `src/index.ts` — move it to `src/helpers.ts` instead.
 
    ```json
    {
-     "plugin": ["./src/index.ts"]
+     "plugins": ["./src/index.ts"]
    }
    ```
 

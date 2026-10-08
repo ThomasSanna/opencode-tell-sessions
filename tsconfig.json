@@ -8,5 +8,5 @@
     "skipLibCheck": true,
     "types": []
   },
-  "include": ["src/index.ts", "src/helpers.ts"]
+  "include": ["src/**/*.ts"]
 }
